@@ -1,0 +1,81 @@
+# Машиночитаемая карта документации sdku_tests (Гидроуклон / СДКУ).
+# Используется агентами и другими репозиториями (.clinerules/00-docs-map).
+# Человекочитаемая версия карты: ../README.md
+version: 1
+updated: 2026-11-17
+product:
+  canonical_name_ru: Гидроуклон
+  canonical_name_en: hydroslope
+  platform: ЭВОСКАДА (СДКУ)
+  note: >
+    «Гидроклон» в старых документах — опечатка, не использовать.
+    Автотесты покрывают часть СДКУ — Гидроуклон (нефть в трубопроводах).
+
+# Статусы: actual | draft | stale | pending-review
+# pending-review — статус будет выставлен по итогам глубокого анализа содержания (фаза 2).
+docs:
+  - id: c4-container-level
+    path: architecture/c4-container-level.md
+    title: C4 Container Level — ЭВОСКАДА (СДКУ)
+    confluence_source: confluence/C4.md
+    status: pending-review
+    notes: По старым диаграммам; реальность бэкенда может отличаться. Переработка — отдельная задача.
+
+  - id: hmi-backend
+    path: services/hmi-backend.md
+    title: Описание микросервиса hmi-backend
+    confluence_source: confluence/hmi-backend-descr.md
+    status: pending-review
+    notes: Считается актуальным (по словам владельца, 2026-11-17).
+
+  - id: test-plan-hydro-calculation
+    path: test-plans/hydro-calculation.md
+    title: Тест-план hydro-calculation (HY-CALC-001…)
+    confluence_source: confluence/test-plan-hydro-calculation.md
+    status: pending-review
+    notes: Считается актуальным (по словам владельца, 2026-11-17). Источник истины по кейсам HY-CALC.
+
+  - id: test-plan-hydro-history-and-model
+    path: test-plans/hydro-history-and-model.md
+    title: Тест-план hydro-history-and-model (HY-HIST-001…)
+    confluence_source: confluence/test-plan-hydro-history-and-model.md
+    status: pending-review
+    notes: Считается актуальным (по словам владельца, 2026-11-17). Источник истины по кейсам HY-HIST.
+
+  - id: test-plan-system-tests
+    path: test-plans/system-tests.md
+    title: Тест-план системных тестов
+    confluence_source: confluence/test-plan-of-system-tests.md
+    status: pending-review
+    notes: Считается актуальным (по словам владельца, 2026-11-17).
+
+  - id: roadmap-coverage
+    path: roadmap/roadmap-coverage.md
+    title: Роадмап покрытия тестирования Гидроуклона
+    confluence_source: confluence/roadmap_coverage.md
+    status: stale
+    notes: >
+      Устаревший черновик: цифры расходятся с тест-планами, есть ссылки на
+      несуществующие документы, нет сроков. Переработка со сроками — в конце
+      финализации документации.
+
+# Синхронизация с корпоративным Confluence.
+sync:
+  source_of_truth: working docs (строки path выше)
+  confluence_dir: confluence/
+  rule: >
+    При изменении рабочего документа актуализировать соответствующий файл
+    confluence_source (формат .md, пригодный для перетаскивания в Confluence)
+    и обновить поле updated здесь. Маппинг «рабочий документ -> страница
+    Confluence» фиксировать в этом файле.
+  confluence_page_titles:
+    confluence/C4.md: C4
+    confluence/roadmap_coverage.md: roadmap_coverage
+    confluence/test-plan-hydro-calculation.md: test-plan hydro-calculation
+    confluence/test-plan-hydro-history-and-model.md: test-plan hydro-history-and-model
+    confluence/test-plan-of-system-tests.md: test-plan of system tests
+    confluence/hmi-backend-descr.md: hmi-backend descr
+
+# Отложено (не создаём до запроса руководства):
+# - Реестр требований к Гидроуклону из всех документов
+# - Матрица покрытия требований

@@ -1,0 +1,1290 @@
+# FUNCTIONALITY.md - Документация микросервиса hydro-calculation
+
+## Проанализировано
+
+| Путь/Файл | Статус |
+|-----------|--------|
+| src/main/java/tnt/evo/hydro/calculation/Application.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/prop/FormattingProps.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/prop/MtProps.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/prop/PlanScannerProps.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/prop/PressureUnits.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/application.yml | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/AlgoManager.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/AlgoStatus.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/dto/MappingToTags.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/dto/SessionToServiceDTO.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/errors/CalculationException.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/errors/CalculationNotReadyException.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/errors/CalculationNotReadyException.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/filter/MultiReadHttpServletRequest.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/filter/RequestInfoFilter.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/modelling/EvoCoreDelegated.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/modelling/GenerateModelAlarmDto.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/modelling/ModelAlarmService.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/modelling/ModelEvoApiManager.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/modelling/ModellingKafkaTnMsgSender.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/BaseAlgorithm.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/ChecklistAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/DisableAndRemontStatusAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/GrzdvStateAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/KipAlarmsAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/KipAlmDevRangeMaxMinAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/KipHeadAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/KipHeadDeltaPressAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/KipHeightAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/KipPressRangeAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/KipPressRateAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/KipStationAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/KipVisibleAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuAlmDevHeadCarrierAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuAlmKipAllLinkAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuAlmKipCountLinkAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuAlmPressDevAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuAlmRateLimitPressAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuAutoControlCanceResetlAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuAutoControlOffAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuAutoControlOnAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuAutoControlTimeLeftAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuCarrierHeadDefAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuControlSetAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuControlUnsetAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuCounterKipAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuDataThinningAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuDiffQAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuGravitySegsAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuIndicatorControlAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuIndicatorLinkAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuMaxAllowablePAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuNewControlTimeAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuRoDistribAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuStationAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuTracingAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/LuUnifiedAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/PumpingPlanAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/SgluPartGrzdvActivityAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/SgluVisibleAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/UrAlmDevRangeMaxMinAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/alg/UrQVmomDeltaAlg.java | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/service/ | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/structure/ | ✓ |
+| src/main/java/tnt/evo/hydro/calculation/utils/ | ✓ |
+| src/main/resources/ | ✓ |
+
+## Ожидается
+
+- Нет (все указанные пути проанализированы)
+
+---
+
+# Обзор архитектуры микросервиса
+
+## Назначение
+Микросервис `hydro-calculation` — это система расчёта гидравлических параметров для магистральных трубопроводов (МП) и линейных участков (ЛУ). Система работает в режиме реального времени, обрабатывая данные с датчиков давления, расхода, высоты и других параметров.
+
+---
+
+# 1. Application Layer (Application.java)
+
+## Назначение
+Точка входа в приложение, конфигурация Spring Boot, регистрация компонентов.
+
+## Ключевые функции
+
+### `createApplicationContext()`
+- Создает контекст приложения Spring
+- Конфигурирует компоненты через `@Configuration`
+
+### `@SpringBootApplication`
+- Основной аннотационный класс приложения
+- Включает `@EnableAutoConfiguration`, `@ComponentScan`, `@Configuration`
+
+## Конфигурация
+- Использует `application.yml` для внешних настроек
+- Регистрирует `AlgoManager` как основной менеджер алгоритмов
+
+---
+
+# 2. Configuration Layer (prop/)
+
+## FormattingProps
+**Назначение**: Форматирование числовых значений для вывода в интерфейсе.
+
+### Ключевые константы
+- `DECIMAL_FORMATTER` — форматтер с 3 знаками после запятой
+- `FLOAT_FORMATTER` — форматтер с 2 знаками после запятой
+- `DOUBLE_FORMATTER` — форматтер с 7 знаками после запятой
+
+## MtProps
+**Назначение**: Настройки для Магистральных Трубопроводов.
+
+### Поля
+- `scope` — список МП для обработки (из application.yml)
+- `dryRunThinning` — режим тестирования прореживания данных
+
+## PlanScannerProps
+**Назначение**: Настройки для планировщика (PumpingPlanAlg).
+
+### Поля
+- `planScannerInterval` — интервал сканирования плана (в минутах)
+
+## PressureUnits
+**Назначение**: Конвертация единиц измерениядавления.
+
+### Методы
+- `pressureKgsToMpa(float kgs)` — конвертация из кгс/см² в МПа
+- `pressureMpaToKgs(float mpa)` — конвертация из МПа в кгс/см²
+
+---
+
+# 3. Application Configuration (application.yml)
+
+## Основные настройки
+```yaml
+hydro-calculation:
+  mt-scope: []  # Список МП для обработки
+  plan-scanner-interval: 1  # Интервал сканирования плана в минутах
+  dry-run-thinning: false  # Режим тестирования прореживания
+```
+
+---
+
+# 4. Algorithm Manager (AlgoManager.java)
+
+## Назначение
+Центральный менеджер, который запускает и координирует все алгоритмы расчёта.
+
+## Ключевые функции
+
+### `@Component`
+- Spring компонент, регистрируется автоматически
+
+### `@PostConstruct`
+- Инициализирует список алгоритмов через `initAlgorithms()`
+
+### `initAlgorithms()`
+- Создает экземпляры всех алгоритмов через `AlgoManager.AlgoFactory`
+- Регистрирует их в `algorithms` список
+
+### `@Scheduled(fixedRate = 60000)`
+- Запускает все алгоритмы каждые 60 секунд
+
+### `runAllAlgorithms()`
+- Запускает каждый алгоритм через `algo.run()`
+- Обрабатывает исключения и логирует ошибки
+
+### `@PreDestroy`
+- Очищает список алгоритмов при остановке приложения
+
+## Алгоритмы, регистрируемые в AlgoManager
+Все классы, расширяющие `BaseAlgorithm`:
+- ChecklistAlg
+- DisableAndRemontStatusAlg
+- GrzdvStateAlg
+- KipAlarmsAlg
+- KipAlmDevRangeMaxMinAlg
+- KipHeadAlg
+- KipHeadDeltaPressAlg
+- KipHeightAlg
+- KipPressRangeAlg
+- KipPressRateAlg
+- KipStationAlg
+- KipVisibleAlg
+- LuAlmDevHeadCarrierAlg
+- LuAlmKipAllLinkAlg
+- LuAlmKipCountLinkAlg
+- LuAlmPressDevAlg
+- LuAlmRateLimitPressAlg
+- LuAutoControlCanceResetlAlg
+- LuAutoControlOffAlg
+- LuAutoControlOnAlg
+- LuAutoControlTimeLeftAlg
+- LuCarrierHeadDefAlg
+- LuControlSetAlg
+- LuControlUnsetAlg
+- LuCounterKipAlg
+- LuDataThinningAlg
+- LuDiffQAlg
+- LuGravitySegsAlg
+- LuIndicatorControlAlg
+- LuIndicatorLinkAlg
+- LuMaxAllowablePAlg
+- LuNewControlTimeAlg
+- LuRoDistribAlg
+- LuStationAlg
+- LuTracingAlg
+- LuUnifiedAlg
+- PumpingPlanAlg
+- SgluPartGrzdvActivityAlg
+- SgluVisibleAlg
+- UrAlmDevRangeMaxMinAlg
+- UrQVmomDeltaAlg
+
+---
+
+# 5. Algorithm Status (AlgoStatus.java)
+
+## Назначение
+Класс для отслеживания состояния выполнения алгоритмов.
+
+## Поля
+- `algoName` — имя алгоритма
+- `startTime` — время начала выполнения
+- `success` — флаг успешного выполнения
+- `errorMsg` — сообщение об ошибке (если есть)
+
+---
+
+# 6. DTO Layer (dto/)
+
+## MappingToTags
+**Назначение**: Преобразование данных между слоями.
+
+### Методы
+- `mapToTags()` — маппинг данных в теги
+- `mapFromTags()` — маппинг из тегов
+
+## SessionToServiceDTO
+**Назначение**: DTO для передачи данных между сессией и сервисом.
+
+### Поля
+- `sessionData` — данные сессии
+- `serviceData` — данные сервиса
+
+---
+
+# 7. Error Handling (errors/)
+
+## CalculationException
+**Назначение**: Исключение для ошибок расчёта.
+
+### Конструкторы
+- Базовый конструктор
+- Конструктор с сообщением
+- Конструктор с причиной
+
+## CalculationNotReadyException
+**Назначение**: Исключение для состояния "не готов к расчёту".
+
+### Конструкторы
+- Базовый конструктор
+- Конструктор с сообщением
+- Конструктор с причиной
+
+---
+
+# 8. Filter Layer (filter/)
+
+## MultiReadHttpServletRequest
+**Назначение**: Расширение HttpServletRequest для поддержки многократного чтения запроса.
+
+### Поля
+- `originalRequest` — оригинальный запрос
+- `bodyReader` — читатель тела запроса
+
+### Методы
+- `getInputStream()` — возвращает новый BufferedReader
+- `getReader()` — возвращает новый BufferedReader
+- `getBodyAsString()` — возвращает тело запроса как String
+
+## RequestInfoFilter
+**Назначение**: Фильтр для извлечения информации из запроса.
+
+### Методы
+- `doFilter()` — основной метод фильтрации
+- `extractRequestInfo()` — извлечение информации из запроса
+
+---
+
+# 9. Modelling Layer (modelling/)
+
+## EvoCoreDelegated
+**Назначение**: Делегирование вызовов Evo для управления временем в сессиях моделирования.
+
+### Методы
+- `getWallclock()` — получение текущего времени (из сессии или системное)
+
+## GenerateModelAlarmDto
+**Назначение**: DTO для генерации алармов в моделировании.
+
+### Поля
+- `tag` — тег
+- `text` — текст аларма
+- `value` — значение
+
+## ModelAlarmService
+**Назначение**: Сервис для работы с алармами в моделировании.
+
+### Методы
+- `createAlarm()` — создание аларма
+- `updateAlarm()` — обновление аларма
+
+## ModelEvoApiManager
+**Назначение**: Менеджер API для Evo в режиме моделирования.
+
+### Методы
+- `tagGet()` — получение значения тега
+- `tagSet()` — установка значения тега
+- `tagGetHistory()` — получение истории тега
+
+## ModellingKafkaTnMsgSender
+**Назначение**: Отправка сообщений через Kafka в режиме моделирования.
+
+### Методы
+- `send()` — отправка сообщения
+
+---
+
+# 10. Algorithm Layer (alg/)
+
+## BaseAlgorithm
+**Назначение**: Базовый класс для всех алгоритмов.
+
+### Константы
+- `MT_TYPE = "MT"` — тип Магистрального Трубопровода
+- `LU_TYPE = "LU"` — тип Линейного Участка
+- `KIP_TYPE = "KIP"` — тип Датчика Давления
+- `GRZDV_TYPE = "GRZDV"` — тип Задвижки
+- `SGLU_TYPE = "SGLU"` — тип Сегмента
+- `ZDV_TYPE = "ZDV"` — тип Клапана
+- `UR_TYPE = "UR"` — тип Расходомера
+- `PLTM_TYPE = "PLTM"` — тип Плотмеростроения
+- `ANY_ROOT = "."` — суффикс для корневых тегов
+- `MIN_DENSITY = 500f` — минимальная плотность
+
+### Поля
+- `evo` — экземпляр Evo (API к базе данных)
+- `data` — кэшированные значения данных
+- `dataInvalid` — кэшированные флаги невалидности
+- `luName2MtReadable` — маппинг имени ЛУ к читаемому имени МП
+- `knownSubscriptions` — список активных подписок
+- `knownExecutors` — список исполнителей
+- `lastClock` — последнее время
+
+### Ключевые методы
+
+#### `run()`
+- Запускает алгоритм
+- Измеряет время выполнения
+- Обрабатывает исключения
+
+#### `calc()`
+- Абстрактный метод, должен быть реализован в подклассах
+
+#### `getMtNames(List<String> scope)`
+- Получает список МП для обработки
+- Фильтрует по scope если задан
+
+#### `calculateHead(Float pressure, Float density, Float height)`
+- Рассчитывает напор: `head = (pressure / density) * 101970 + height`
+
+#### `calculateInterpolated(float coordLeft, float coordTarget, float coordRight, float valueLeft, float valueRight)`
+- Линейная интерполяция значения по координате
+- Использует `fitInRange` для ограничения результата
+
+#### `setValueAndInvalid(String tagName, Object value, boolean invalid)`
+- Устанавливает значение тега и флаг невалидности
+- Записывает в кэш
+
+#### `setAlarm(String tagName, String text, String text0, Object value, String alertClassName, int sequencedId, Instant occuredAt)`
+- Создает и отправляет аларм через `evo.makeAlarm()`
+
+#### `getParseableAlarmMessageForLu(String luName, String message)`
+- Формирует сообщение аларма в формате: `.МП.ТУ.ЛУ.ЛУ..Текст.n`
+
+#### `getUniqueObjects(List<TagValue> tagValues)`
+- Извлекает уникальные имена объектов из списка тегов
+
+#### `getUniqueParentObjects(List<TagValue> tagValues)`
+- Извлекает уникальные родительские имена объектов
+
+#### `getKipFromLu(String luName)`
+- Получает список датчиков давления (KIP) внутри ЛУ
+
+#### `getFiniteValueOrNull(TagValue/String)`
+- Получает конечное значение или null (проверяет null, invalid, NaN, Infinite)
+
+#### `getIntegerValueOrNull(TagValue/String)`
+- Получает целочисленное значение или null
+
+#### `getStringValueOrNull(TagValue/String)`
+- Получает строковое значение или null
+
+#### `getBooleanValueOrNull(TagValue/String)`
+- Получает булево значение или null
+
+#### `getListStringOrNull(TagValue/String)`
+- Получает список строк или null
+
+#### `isInRange(float value, float rangeBorder1, float rangeBorder2)`
+- Проверяет, находится ли значение в диапазоне (включая границы)
+
+#### `fitInRange(float value, float rangeBorder1, float rangeBorder2)`
+- Ограничивает значение пределами диапазона
+
+#### `destroy()`
+- Очищает подписки и исполнители при остановке алгоритма
+
+## ChecklistAlg
+**Назначение**: Проверка списка параметров.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## DisableAndRemontStatusAlg
+**Назначение**: Определение статуса ремонта/отключения.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## GrzdvStateAlg
+**Назначение**: Определение состояния задвижки.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## KipAlarmsAlg
+**Назначение**: Генерация алармов для датчиков давления.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## KipAlmDevRangeMaxMinAlg
+**Назначение**: Контроль выхода давления за пределы диапазона.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## KipHeadAlg
+**Назначение**: Расчёт напора для датчиков давления.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## KipHeadDeltaPressAlg
+**Назначение**: Расчёт разницы напора.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## KipHeightAlg
+**Назначение**: Расчёт высоты для датчиков давления.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## KipPressRangeAlg
+**Назначение**: Контроль давления в диапазоне.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## KipPressRateAlg
+**Назначение**: Контроль скорости изменения давления.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## KipStationAlg
+**Назначение**: Контроль стационарности датчиков давления.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## KipVisibleAlg
+**Назначение**: Контроль видимости датчиков давления.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuAlmDevHeadCarrierAlg
+**Назначение**: Аларм отклонения несущей.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuAlmKipAllLinkAlg
+**Назначение**: Аларм потери связи со всеми датчиками.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuAlmKipCountLinkAlg
+**Назначение**: Аларм потери связи с определённым числом датчиков.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuAlmPressDevAlg
+**Назначение**: Аларм отклонения давления.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuAlmRateLimitPressAlg
+**Назначение**: Аларм превышения предела скорости изменения давления.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuAutoControlCanceResetlAlg
+**Назначение**: Отмена/сброс автоматического контроля.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuAutoControlOffAlg
+**Назначение**: Отключение автоматического контроля.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuAutoControlOnAlg
+**Назначение**: Включение автоматического контроля.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuAutoControlTimeLeftAlg
+**Назначение**: Расчёт времени до конца автоматического контроля.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuCarrierHeadDefAlg
+**Назначение**: Определение несущей для ЛУ.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuControlSetAlg
+**Назначение**: Установка состояния контроля для ЛУ.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuControlUnsetAlg
+**Назначение**: Снятие состояния контроля с ЛУ.
+
+### Методы
+- `calc()` — основной метод расчёта
+
+## LuCounterKipAlg
+**Назначение**: Подсчёт числа активных датчиков на ЛУ.
+
+### Методы
+- `calc()` — запускается с задержкой 2 секунды, повторяется каждые 2 секунды
+- `countKipOnline()` — считает активные датчики по давлению (KIP_PRESS)
+- `getKipFromLu(String luName)` — получает датчики из ЛУ
+
+## LuDataThinningAlg
+**Назначение**: Прореживание/фильтрация/сглаживание сырых данных ЛУ о трубопроводе (HYDRO-74).
+
+### Методы
+- `calc()` — обрабатывает все ЛУ в scope
+- `processAllNestedAt(String parentObjectName)` — обрабатывает вложенные объекты
+- `processLu(String luName)` — обрабатывает конкретный ЛУ
+  - Получает данные: LU_CARRIER_DATA1, LU_CARRIER_DATA2, LU_KM
+  - Строит список срезов трубопровода через `getPipeSlices()`
+  - Удаляет дубликаты
+  - Прореживает по интерполяции с точностью 0.001
+  - Прореживает по масштабу (координатный масштаб)
+  - Записывает результаты в теги: LU_CARRIERDEF, LU_KM, LU_CARRIER_DATA1, LU_CARRIER_DATA2
+
+### getPipeSlices()
+- Извлекает массивы данных из тегов
+- Проверяет корректность данных
+- Удаляет внутренние повторы (кроме краевых)
+- Возвращает Triple<LinkedList<Slice>, Integer, Float>
+
+### thinByInterpolation()
+- Удаляет срезы, где значения совпадают с интерполяцией между соседними срезами (точность 0.001)
+
+### thinByScale()
+- Удаляет срезы, где расстояние между соседними < coordScaleEpsilon (1/3000 от длины)
+- Или где значения внутри диапазона между соседними
+
+### Slice (record)
+```java
+record Slice(float km, float v1, float v2) {}
+```
+
+## LuDiffQAlg
+**Назначение**: Контроль расчета разницы расходов (HYDRO-276).
+
+### Методы
+- `calc()` — обрабатывает все ЛУ в scope
+- `processAllNestedAt(String parentObjectName)` — обрабатывает вложенные объекты
+- `calcAvg()` — запускается каждые 2 секунды, считает средние значения за час
+- `calcQVmom(...)` — рассчитывает разницу расходов между краевыми расходомерами
+- `setDataAndAlarms(...)` — устанавливает значения и алармы
+- `extractBorderUR(String luName)` — извлекает краевые расходомеры по координате
+
+### Константы
+- `LU_DIFFQMOM = ".TI.DiffQmom"` — моментальный расход
+- `LU_DIFFQAVG = ".TI.DiffQavg"` — средний расход
+- `LU_DIFFQAVGSTATION = ".TI.DiffQavgStation"` — средний расход в стационарном режиме
+- `LU_DIFFQMOMLIMITMIN = ".TI.DiffQmomLimitMin"` — нижний предел
+- `LU_DIFFQMOMLIMITMAX = ".TI.DiffQmomLimitMax"` — верхний предел
+- `LU_DIFFQAVGLIMITMIN = ".TI.DiffQavgLimitMin"` — нижний предел среднего
+- `LU_DIFFQAVGLIMITMAX = ".TI.DiffQavgLimitMax"` — верхний предел среднего
+- `LU_DIFFQAVGLIMITSTATIONMIN = ".TI.DiffQavgLimitStationMin"` — нижний предел стационарного
+- `LU_DIFFQAVGLIMITSTATIONMAX = ".TI.DiffQavgLimitStationMax"` — верхний предел стационарного
+- `LU_DIFFQMOMALARM = ".Alm.AlmDevQmom"` — аларм для моментального
+- `LU_DIFFQAVGALARM = ".Alm.AlmDevQavg"` — аларм для среднего
+- `LU_DIFFQAVGALARMSTATION = ".Alm.AlmDevQavgStation"` — аларм для стационарного
+
+### History (inner class)
+```java
+class History {
+    public long lastPoll;
+    public TreeMap<Long, Float> fetchedData;
+}
+```
+
+## LuGravitySegsAlg
+**Назначение**: Расчёт самотечных участков на ТУ (HYDRO-173).
+
+### Методы
+- `calc()` — инициализирует подписки на события
+- `updateAndCalcLu(String luName)` — обновляет данные и считает
+- `calcGravityForLu(String luName)` — считает самотёки в реальном времени
+- `calcGravityScheduleForLu(String luName)` — считает плановые самотёки
+- `calcGravitySegs(...)` — основной алгоритм расчёта самотёчного участка
+- `getPassPointIndex(...)` — находит перевальную точку
+- `registerAlarm(...)` — регистрирует аларм о самотёке
+- `clearAlarm(...)` — очищает аларм
+
+### LuData (record)
+```java
+record LuData(
+    List<Pair<Float, String>> allKipsSortedByKm,
+    List<Float> luKmList,
+    List<Float> luHeightList,
+    List<Integer> heightPeakIndexes,
+    Integer controlState,
+    Float gravityPossible
+) {}
+```
+
+### GravityReport (record)
+```java
+record GravityReport(
+    Float passPoint,
+    List<String> gravitySegsList,
+    Float passPointPossible
+) {}
+```
+
+### findPeakIndexesPlateauVersion()
+- Находит пики с учётом плато (горизонтальных участков)
+
+### findPeakIndexes()
+- Находит пики без учёта плато
+
+### findIntersectionWalkFromRight()
+- Находит пересечение линии самотёка с профилем трубы справа налево
+
+### findIndexIntersectionWalkFromLeft()
+- Находит пересечение линии самотёка с профилем трубы слева направо
+
+## LuIndicatorControlAlg
+**Назначение**: Расчёт индикатора контроля и отклонений (HYDRO-91).
+
+### Методы
+- `calc()` — обрабатывает все ЛУ в scope
+- `processAllNestedAt(String parentObjectName)` — обрабатывает вложенные объекты
+- `processLu(String luName)` — инициализирует подписку
+- `calcIndicatorControlCB(...)` — callback для расчёта
+- `getState(List<Tag>)` — определяет состояние контроля
+
+### IndicatorControlState (enum)
+| State | Status | Описание |
+|-------|--------|----------|
+| TransitionOn | 5 | Переход в режим контроля |
+| ControlAutoTimeLeft | 4 | Осталось времени до автоматического контроля |
+| RangedKipAlarmed | 3 | Аларм на датчике с диапазоном |
+| LonesomeKipAlarmed | 2 | Аларм на одиночном датчике |
+| Norm | 1 | Нормальный режим |
+| ControlOn | 0 | Контроль включён |
+
+## LuIndicatorLinkAlg
+**Назначение**: Расчёт индикатора связи (HYDRO-92).
+
+### Методы
+- `calc()` — обрабатывает все ЛУ в scope
+- `processAllNestedAt(String parentObjectName)` — обрабатывает вложенные объекты
+- `processLu(String luName)` — инициализирует подписку
+- `calcIndicatorLinkCB(...)` — callback для расчёта
+- `calcIndicatorLinkState(...)` — определяет состояние связи
+
+### IndicatorLinkState (enum)
+| State | Status | Описание |
+|-------|--------|----------|
+| AlmKipAllLink | 2 | Аларм: потеря связи со всеми датчиками |
+| AlmKipCountLink | 1 | Аларм: потеря связи с определённым числом датчиков |
+| Norm | 0 | Нормальный режим связи |
+
+## LuMaxAllowablePAlg
+**Назначение**: Расчёт максимально допустимых значений давлений (несущая) (HYDRO-78).
+
+### Методы
+- `calc()` — обрабатывает все ЛУ в scope
+- `processAllNestedAt(String parentObjectName)` — обрабатывает вложенные объекты
+- `processLu(String luName)` — инициализирует подписку
+- `calcMaxAllowablePAlgCB(...)` — callback для расчёта
+- `getNewDef(...)` — применяет правила к несущей
+- `applyCorrections(...)` — применяет ограничения по диапазонам км
+- `getRulesByIntervals(...)` — парсит правила из строки
+
+### lastRulesByTagName
+- Кэширует последние применённые правила для отслеживания изменений
+
+## LuNewControlTimeAlg
+**Назначение**: Перенос времени контроля участка.
+
+### Методы
+- `calc()` — инициализирует подписку на LU_SETTIMESHIFT
+- `calcByEvent(...)` — обрабатывает событие установки времени контроля
+- `performTimeshift(...)` — переносит значения датчиков на новую дату
+- `loadHistorySliceAtDatetime(...)` — загружает историю значений на момент времени
+- `getTagsForLu(String luName)` — собирает список тегов для выгрузки
+
+## LuRoDistribAlg
+**Назначение**: Расчет распределения плотности по технологическому участку (HYDRO-224).
+
+### Методы
+- `calc()` — инициализирует подписки и планировщик
+- `processAllNestedAt(String parentObjectName)` — обрабатывает вложенные объекты
+- `processLu(String luName)` — инициализирует подписки
+- `calcLuParamsCB(...)` — callback для расчёта параметров
+- `controlEnterManualCB(...)` — callback для ручного ввода
+- `initDataDistrib(...)` — инициализирует распределение плотности
+- `calcSgLuParamsCB(...)` — callback для сегментов
+- `calcUrParamsCB(...)` — callback для расходомеров
+- `calcPltmParamsCB(...)` — callback для плотмеростроений
+- `calcRoDistrib()` — основной цикл расчёта распределения плотности
+- `initSubscribeLu()` — подписка на ЛУ
+- `initSubscribeSglu()` — подписка на сегменты
+- `initSubscribeUr()` — подписка на расходомеры
+- `initSubscribePltm()` — подписка на плотмеростроения
+- `initSubscribeKip()` — подписка на датчики давления
+- `initScheduledExecutorService()` — планировщик расчёта каждые 1000мс с задержкой 2000мс
+
+### Состояние
+- `dataLuList` — список ЛУ для обработки
+- `dataRoDistrib` — распределение плотности по ЛУ
+- `dataKmDistrib` — распределение км по ЛУ
+- `dataDensDef` — начальная плотность
+- `dataDensLimit` — предел изменения плотности
+- `dataDensTime` — интервал перерасчёта
+- `dataPrevCalcTime` — время последнего расчёта
+- `dataSglu` — данные сегментов
+- `dataLuSglus` — сегменты внутри ЛУ
+- `dataQvmom` — расходомеры
+- `dataQvmomKm` — км расходомеров
+- `dataRo` — плотность сегментов
+- `dataRoKm` — км сегментов
+
+## LuStationAlg
+**Назначение**: Контроль стационарности давлений на ТУ (HYDRO-161).
+
+### Методы
+- `calc()` — инициализирует подписки
+- `collectLuSettingsAndCalc(...)` — собирает настройки и считает
+- `triggerOnKipUpdates(...)` — триггер на обновления датчиков
+- `calcStationsLu(String luName)` — считает стационарность
+
+### Параметры
+- `LU_COUNTKIPNOSTATION` — порог числа нестационарных датчиков
+- `LU_LIMITKIP` — порог числа активных датчиков
+
+## LuTracingAlg
+**Назначение**: Следы (Трассировка) (HYDRO-406).
+
+### Методы
+- `calc()` — инициализирует подписку
+- `luTraceOnOff(...)` — включает/выключает трассировку
+- `startTracingFor(String luName)` — запускает трассировку
+- `stopTracingFor(String luName)` — останавливает трассировку
+- `doTraceIteration(String luName)` — итерация трассировки
+- `processDataItem(...)` — обработка данных
+- `initLuStruct(String luName)` — инициализирует структуру
+- `registerDataItem(...)` — регистрирует тег для трассировки
+- `getTraceTTLSecs(...)` — получает TTL для трассировки
+
+### nameToData
+```java
+Map<String, HashMap<Pair<String, String>, LinkedHashMap<Long, String>>>
+```
+- Ключ: (тег_чтения, тег_записи)
+- Значение: LinkedHashMap с TTL
+
+## LuUnifiedAlg
+**Назначение**: Применение унифицированных диапазонов отклонений.
+
+### Методы
+- `calc()` — инициализирует подписки на 6 параметров:
+  - LU_UNIFIED_PRESSDELTARANGEMAX → KIP_PRESSDELTARANGEMAX
+  - LU_UNIFIED_PRESSDELTARANGEMIN → KIP_PRESSDELTARANGEMIN
+  - LU_UNIFIED_QVMOMDELTARANGEMAX → UR_QVMOMDELTARANGEMAX
+  - LU_UNIFIED_QVMOMDELTARANGEMIN → UR_QVMOMDELTARANGEMIN
+  - LU_UNIFIED_PRESSDELTASCHEDULERANGEMAX → KIP_PRESSDELTASCHEDULERANGEMAX
+  - LU_UNIFIED_PRESSDELTASCHEDULERANGEMIN → KIP_PRESSDELTASCHEDULERANGEMIN
+
+- `updateNested(...)` — применяет значение к вложенным объектам
+
+## PumpingPlanAlg
+**Назначение**: Расчёт плана перекачки (Pumping Plan).
+
+### Методы
+- `calc()` — инициализирует планировщик на 60 минут
+- `updatePlans(...)` — обновление планов
+- `updatePlansByKipEvent(...)` — обновление по событиям датчиков
+- `updatePlanForLu(String luName)` — обновление плана для ЛУ
+- `tickPlan()` — тик планировщика каждую минуту
+- `getRegimesData(...)` — парсит данные режимов из JSON
+
+### luPlans
+```java
+Map<String, Map< Pair<ZonedDateTime, ZonedDateTime>, Map<String, JsonNode>>>
+```
+- Ключ: имя ЛУ
+- Значение: Map<интервал_времени, Map<тег, значение>>
+
+## SgluPartGrzdvActivityAlg
+**Назначение**: Определение активности сегмента (HYDRO-146).
+
+### Методы
+- `calc()` — обрабатывает все ЛУ в scope
+- `processAllNestedAt(String parentObjectName)` — обрабатывает вложенные объекты
+- `processLu(String luName)` — инициализирует подписки на задвижки
+- `calcSgluPartGrzdvActivityCB(...)` — callback для расчёта активности
+
+### Состояние
+- `SGLU_PARTGRZDV = ".PartGRZDV"` — список задвижек для сегмента
+- `GRZDV_STATUS = ".Status"` — статус задвижки
+- `GRZDV_ACTIVITY = ".Activity"` — активность сегмента
+
+## SgluVisibleAlg
+**Назначение**: Контроль видимости сегмента (HYDRO-198).
+
+### Методы
+- `calc()` — обрабатывает все ЛУ в scope
+- `processAllNestedAt(String parentObjectName)` — обрабатывает вложенные объекты
+- `processLu(String luName)` — инициализирует подписки
+- `calcSgluVisibleCB(...)` — callback для расчёта видимости
+
+### Логика видимости
+| Priority | ControlOn | Activity | Visible |
+|----------|-----------|----------|---------|
+| 0 | - | - | false |
+| >0 | 0 | true | true |
+| 1 | 1 | - | true |
+| иначе | - | - | false |
+
+## UrAlmDevRangeMaxMinAlg
+**Назначение**: Контроль выхода расхода за границы коридора (HYDRO-228).
+
+### Методы
+- `calc()` — обрабатывает все ЛУ в scope
+- `processAllNestedAt(String parentObjectName)` — обрабатывает вложенные объекты
+- `processLu(String luName)` — инициализирует подписки
+- `calcAlmDevRangeMaxMinCB(...)` — callback для расчёта
+
+### Состояние
+- `UR_QVMOMDELTARANGEMAX` — верхний предел отклонения расхода
+- `UR_QVMOMDELTARANGEMIN` — нижний предел отклонения расхода
+- `UR_ALMQVMOMRANGEMAX` — аларм превышения верхнего предела
+- `UR_ALMQVMOMRANGEMIN` — аларм превышения нижнего предела
+
+## UrQVmomDeltaAlg
+**Назначение**: Расчёт отклонений расхода (HYDRO-229).
+
+### Методы
+- `calc()` — инициализирует подписку
+- `calcUrEvents(...)` — callback для расчёта
+
+### Состояние
+- `UR_QVMOM` — автоматический расход
+- `UR_QVMOMMANUAL` — ручной расход
+- `UR_QVMOMSTATION` — стационарный расход
+- `UR_QVMOMDELTA` — отклонение расхода
+- `UR_ALMQVMOMINVALID` — флаг невалидности
+
+---
+
+# 11. Structure Layer (structure/)
+
+## LuParameters
+**Назначение**: Константы и структуры для параметров ЛУ.
+
+### LuStructure
+- `LU_KM` — километровые отметки
+- `LU_HEIGHT` — высоты
+- `LU_CONTROL` — состояние контроля
+- `LU_STATION` — стационарность
+- `LU_CARRIERDEF` — несущая
+- `LU_CARRIER_DATA1` — данные несущей 1
+- `LU_CARRIER_DATA2` — данные несущей 2
+- `LU_PMAXDEFAULT` — максимальное давление по умолчанию
+- `LU_GRAVITYSEGS` — самотёчные участки
+- `LU_PASSPOINTS` — перевальные точки
+- `LU_PASSPOINTSPOSSIBLE` — возможные перевальные точки
+- `LU_ALMGRAVITY` — аларм самотёка
+- `LU_ALMGRAVITYPOSSIBLE` — аларм возможного самотёка
+- `LU_GRAVITYSEGSSCHEDULE` — плановые самотёки
+- `LU_RODISTRIB` — распределение плотности
+- `LU_RODISTRIBMANUAL` — ручное распределение плотности
+- `LU_DENSTIME` — время перерасчёта плотности
+- `LU_DENSDEF` — начальная плотность
+- `LU_DENSLIMIT` — предел изменения плотности
+- `LU_ALMKIPALLLINK` — аларм потери связи со всеми
+- `LU_ALMKIPCOUNTLINK` — аларм потери связи с числом
+- `LU_INDICATORLINK` — индикатор связи
+- `LU_INDICATORCONTROL` — индикатор контроля
+- `LU_CONTROLAUTOTIMELEFT` — время до автоматического контроля
+- `LU_NEWCONTROLTIME` — новое время контроля
+- `LU_SETTIMESHIFT` — флаг установки времени контроля
+- `LU_TRACEON` — флаг активной трассировки
+- `LU_TRACESON` — включить трассировку
+- `LU_TRACESOFF` — выключить трассировку
+- `LU_TRACEINTERVAL` — интервал трассировки
+- `LU_TRACETTL` — TTL трассировки
+- `LU_TRACEIGNORETTL` — игнорировать TTL
+- `LU_UNIFIED_PRESSDELTARANGEMAX` — унифицированный верхний предел
+- `LU_UNIFIED_PRESSDELTARANGEMIN` — унифицированный нижний предел
+- `LU_UNIFIED_QVMOMDELTARANGEMAX` — унифицированный верхний предел расхода
+- `LU_UNIFIED_QVMOMDELTARANGEMIN` — унифицированный нижний предел расхода
+- `LU_UNIFIED_PRESSDELTASCHEDULERANGEMAX` — унифицированный верхний предел плана
+- `LU_UNIFIED_PRESSDELTASCHEDULERANGEMIN` — унифицированный нижний предел плана
+- `LU_ARMT_PUMPPLAN` — план перекачки
+- `LU_ARMT_PIPEPRESS` — давление труб
+- `LU_SCHEDULEREGIMNAME` — название режима
+- `LU_PRESSMANUALLIMIT` — ручные пределы давления
+- `LU_ALMCARRIERONUSER` — аларм изменения несущей пользователем
+- `LU_COUNTKIPNOSTATION` — порог нестационарных
+- `LU_LIMITKIP` — порог активных
+- `LU_ALMDEVPRESS` — аларм отклонения давления
+- `LU_ALMDEVRANGE` — аларм диапазона
+- `LU_ALMDEVHEADCARRIER` — аларм отклонения несущей
+- `LU_ALMRATELIMITPRESS` — аларм предела скорости
+- `LU_GRAVITYPOSSIBLE` — возможные самотёки
+
+## KipParameters
+**Назначение**: Константы и структуры для параметров KIP.
+
+### KipStructure
+- `KIP_PRESS` — давление
+- `KIP_HEAD` — напор
+- `KIP_HEIGHT` — высота
+- `KIP_KM` — километр
+- `KIP_DISABLE` — отключен
+- `KIP_VISIBLE` — видим
+- `KIP_STATION` — стационарен
+- `KIP_ALMDEV` — аларм отклонения
+- `KIP_ALMDEVMAX` — аларм макс отклонения
+- `KIP_ALMDEVMIN` — аларм мин отклонения
+- `KIP_ALMDEVMAXRANGE` — аларм макс диапазона
+- `KIP_ALMDEVMINRANGE` — аларм мин диапазона
+- `KIP_ALMDEVMAXRANGEMIN` — аларм макс диапазона мин
+- `KIP_ALMDEVMAXRANGEMAX` — аларм макс диапазона макс
+- `KIP_ALMDEVMINRANGEMIN` — аларм мин диапазона мин
+- `KIP_ALMDEVMINRANGEMAX` — аларм мин диапазона макс
+- `KIP_PRESSRATE` — скорость изменения давления
+- `KIP_PRESSRATETAG` — тег скорости
+- `KIP_PRESSRATETAGMIN` — мин скорость
+- `KIP_PRESSRATETAGMAX` — макс скорость
+- `KIP_PRESSRATETAGALARM` — аларм скорости
+- `KIP_PRESSRANGE` — диапазон давления
+- `KIP_PRESSRANGEMIN` — мин диапазон
+- `KIP_PRESSRANGEMAX` — макс диапазон
+- `KIP_PRESSRANGEALARM` — аларм диапазона
+- `KIP_HEADDELTA` — разница напора
+- `KIP_PRESSDELTA` — разница давления
+- `KIP_HEADDELTARANGE` — диапазон разницы напора
+- `KIP_PRESSDELTARANGE` — диапазон разницы давления
+- `KIP_HEADDELTARANGEMIN` — мин диапазон разницы напора
+- `KIP_HEADDELTARANGEMAX` — макс диапазон разницы напора
+- `KIP_PRESSDELTARANGEMIN` — мин диапазон разницы давления
+- `KIP_PRESSDELTARANGEMAX` — макс диапазон разницы давления
+- `KIP_HEADDELTASCHEDULERANGE` — диапазон разницы напора плана
+- `KIP_PRESSDELTASCHEDULERANGE` — диапазон разницы давления плана
+- `KIP_HEADDELTASCHEDULERANGEMIN` — мин диапазон разницы напора плана
+- `KIP_HEADDELTASCHEDULERANGEMAX` — макс диапазон разницы напора плана
+- `KIP_PRESSDELTASCHEDULERANGEMIN` — мин диапазон разницы давления плана
+- `KIP_PRESSDELTASCHEDULERANGEMAX` — макс диапазон разницы давления плана
+- `KIP_RO` — плотность
+- `KIP_ROSCHEDULE` — плановая плотность
+- `KIP_ARMTID` — ID арматуры
+- `KIP_HEADSCHEDULE` — плановый напор
+- `KIP_PRESSSCHEDULE` — плановое давление
+
+## UrParameters
+**Назначение**: Константы и структуры для параметров UR.
+
+### UrStructure
+- `UR_QVMOM` — моментальный расход
+- `UR_QVMOMMANUAL` — ручной расход
+- `UR_QVMOMSTATION` — стационарный расход
+- `UR_QVMOMDELTA` — отклонение расхода
+- `UR_ALMQVMOMINVALID` — флаг невалидности
+- `UR_ALMQVMOMRANGEMAX` — аларм макс диапазона
+- `UR_ALMQVMOMRANGEMIN` — аларм мин диапазона
+- `UR_DISABLE` — отключен
+- `UR_MANUAL` — ручной режим
+- `UR_KM` — километр
+
+## SgluParameters
+**Назначение**: Константы и структуры для параметров SGLU.
+
+### SgluStructure
+- `SGLU_VISIBLE` — видим
+- `SGLU_ACTIVITY` — активен
+- `SGLU_PARTGRZDV` — список задвижек
+- `SGLU_PARTPLTM` — список плотмеростроений
+- `SGLU_PARTUR` — список расходомеров
+- `SGLU_PRIORITY` — приоритет
+- `SGLU_CONTROLON` — контроль включён
+- `SGLU_DIAMETER` — диаметр
+- `SGLU_KM` — километр
+
+## GrzdvParameters
+**Назначение**: Константы и структуры для параметров GRZDV.
+
+### GrzdvStructure
+- `GRZDV_STATUS` — статус
+- `GRZDV_ACTIVITY` — активность
+
+## ZdvParameters
+**Назначение**: Константы и структуры для параметров ZDV.
+
+### ZdvStructure
+- `ZDV_STATUS` — статус
+- `ZDV_ACTIVITY` — активность
+
+## PltmParameters
+**Назначение**: Константы и структуры для параметров PLTM.
+
+### PltmStructure
+- `PLTM_RO` — плотность
+- `PLTM_ROMANUAL` — ручная плотность
+- `PLTM_ISMANUAL` — ручной режим
+- `PLTM_DISABLE` — отключен
+- `PLTM_KM` — километр
+- `PLTM_ALMROINVALID` — флаг невалидности
+
+---
+
+# 12. Utils Layer (utils/)
+
+## UnitConversion
+**Назначение**: Конвертация единиц измерениядавления.
+
+### Методы
+- `pressureKgsToMpa(float kgs)` — кгс/см² → МПа
+- `pressureMpaToKgs(float mpa)` — МПа → кгс/см²
+
+## CommaFormatter
+**Назначение**: Форматирование чисел с запятой.
+
+### Методы
+- `format2digits(float value)` — формат с 2 знаками после запятой
+
+## PressureFormatter
+**Назначение**: Форматирование давления.
+
+### Методы
+- `format(float pressure)` — форматирование давления
+
+---
+
+# 13. Resources (src/main/resources/)
+
+## application.yml
+**Назначение**: Конфигурация приложения.
+
+### Ключевые секции
+```yaml
+hydro-calculation:
+  mt-scope: []
+  plan-scanner-interval: 1
+  dry-run-thinning: false
+```
+
+---
+
+# Точки интеграции (API Layer)
+
+## Evo API
+Основной интерфейс взаимодействия с базой данных:
+- `tagGet(String tagName)` — получение значения тега
+- `tagSet(String tagName, Object value, boolean invalid, Date timestamp)` — установка значения
+- `tagGetHistory(...)` — получение истории
+- `tagSubscribe(...)` — подписка на изменения
+- `tagUnsubscribe(Subscription)` — отписка
+- `makeAlarm(AlarmDto)` — создание аларма
+- `objectExists(String objectName)` — проверка существования объекта
+- `objectNames(String pattern, String type)` — получение объектов по шаблону
+- `getObjectChildren(String parentName)` — получение детей
+- `getObjectParent(String childName)` — получение родителя
+- `findTag(String tagName)` — поиск тега
+
+## Kafka
+Отправка сообщений через ModellingKafkaTnMsgSender в режиме моделирования.
+
+---
+
+# Состояния системы
+
+## Control State (LU_CONTROL)
+| Значение | Описание |
+|----------|----------|
+| 0 | Контроль выключен |
+| 1 | Контроль включён |
+| 2 | Переход в контроль |
+
+## Station State (LU_STATION)
+| Значение | Описание |
+|----------|----------|
+| true | Стационарный |
+| false | Нестационарный |
+
+## Indicator Control State
+| Значение | Описание |
+|----------|----------|
+| 0 | ControlOn |
+| 1 | Norm |
+| 2 | LonesomeKipAlarmed |
+| 3 | RangedKipAlarmed |
+| 4 | ControlAutoTimeLeft |
+| 5 | TransitionOn |
+
+## Indicator Link State
+| Значение | Описание |
+|----------|----------|
+| 0 | Norm |
+| 1 | AlmKipCountLink |
+| 2 | AlmKipAllLink |
+
+---
+
+# Важные константы
+
+## Типы объектов
+- `MT_TYPE = "MT"` — Магистральный Трубопровод
+- `LU_TYPE = "LU"` — Линейный Участок
+- `KIP_TYPE = "KIP"` — Датчик Давления
+- `GRZDV_TYPE = "GRZDV"` — Задвижка
+- `SGLU_TYPE = "SGLU"` — Сегмент
+- `ZDV_TYPE = "ZDV"` — Клапан
+- `UR_TYPE = "UR"` — Расходомер
+- `PLTM_TYPE = "PLTM"` — Плотмеростроение
+
+## Минимальная плотность
+- `MIN_DENSITY = 500f` кг/м³
+
+---
+
+# Обработка ошибок
+
+## CalculationException
+Базовое исключение для ошибок расчёта.
+
+## CalculationNotReadyException
+Исключение для состояния "не готов к расчёту".
+
+---
+
+# Авторизация
+
+В коде не обнаружена реализация авторизации. Доступ к API осуществляется через Evo API.
+
+---
+
+# Side Effects
+
+## Алармы
+Система генерирует алармы через `evo.makeAlarm()`:
+- Алармы отклонения давления
+- Алармы выхода за пределы диапазона
+- Алармы потери связи
+- Алармы изменения несущей пользователем
+- Алармы самотёка
+
+## Запись в теги
+Алгоритмы записывают значения в теги:
+- Значения датчиков (давление, расход, напор)
+- Флаги состояния (стационарность, контроль, связь)
+- Алармы
+- Распределение плотности
+- Самотёчные участки
+
+---
+
+# Валидация
+
+## getFiniteValueOrNull()
+Проверяет:
+- null
+- invalid флаг
+- NaN
+- Infinite
+
+## getIntegerValueOrNull()
+Проверяет:
+- null
+- invalid флаг
+
+## getBooleanValueOrNull()
+Проверяет:
+- null
+- invalid флаг
+
+## getListStringOrNull()
+Проверяет:
+- null
+- invalid флаг
+
+---
+
+# Бизнес-логика
+
+## Расчёт напора
+```
+head = (pressure / density) * 101970 + height
+```
+
+## Линейная интерполяция
+```
+value = valueLeft + (coordTarget - coordLeft) / (coordRight - coordLeft) * (valueRight - valueLeft)
+```
+
+## Проверка диапазона
+```
+isInRange(value, min, max) = (min <= value && value <= max) || (max <= value && value <= min)
+```
+
+## Ограничение значения
+```
+fitInRange(value, min, max) = clamp(value, min, max)
+```
+
+---
+
+# Конфигурация
+
+## MtProps.scope
+Список МП для обработки (из application.yml).
+
+## PlanScannerProps.planScannerInterval
+Интервал сканирования плана в минутах (из application.yml).
+
+## MtProps.dryRunThinning
+Режим тестирования прореживания (из application.yml).
+
+---
+
+# Ожидается
+
+- Нет (все указанные пути проанализированы)
