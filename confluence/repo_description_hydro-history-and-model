@@ -1,0 +1,1277 @@
+# FUNCTIONALITY.md — Сервис Воспроизведения истории и Моделирования
+
+## Проанализировано
+- `readme.md`
+- `docs/spring-configuration-metadata.md`
+
+## Ожидается
+- (нет)
+
+---
+
+# 1. Общие сведения о функциональном назначении
+
+## Сессии и Прикладные сессии
+Сервис управляет сессиями и пошаговым воспроизведением данных из Clickhouse в Kafka, имитируя реальный поток данных. Поддерживаются значения сигналов (`tagValue`) и сообщения (`alarmValue`).
+
+### Виды сессий
+1. **Плеер истории (historical + history)**
+2. **Воспроизведение сохраненных сессий (historical + saved)**
+3. **Импортированный поток данных (historical + imported)**
+4. **Моделирование (modelling)**
+
+### Прикладные сессии
+Реализованы в приложениях:
+- [hmi-backend](https://.../projects/EVOSCADA/repos/hmi-backend)
+- [hydro-calculation](https://.../projects/EVOSCADA/repos/hydro-calculation)
+- [alarm-service](https://.../projects/EVOSCADA/repos/alarm-service)
+- [alarm-view-service](https://.../projects/EVOSCADA/repos/alarm-view-service)
+
+Прикладные сессии обеспечивают изоляцию окружения в UI Гидроуклон, чтобы расчёты велись изолированно от оперативных данных.
+
+## Прочие процессы работы с данными
+
+### Сохранение модельной сессии
+По окончании работы с сессией моделирования предоставляется возможность сохранить результат (поток данных) из Kafka обратно в Clickhouse. В этом случае сессия "modelling" превращается в сессию "historical + saved".
+
+### Сервис отчетов Гидроуклон
+Выгрузка журнала событий за интервал времени, в формате .xlsx.
+
+---
+
+# 2. Логическая структура
+
+```
+/controller/                       # REST-контроллеры
+|- ModHistController.java          # Работа с сессиями Плеера и Моделирования
+|- HistoryImportController.java    # Импорт потока данных, породит новую сессию, в которую и импортирует
+|- ReportController.java           # Сервис отчетов Гидроуклон
+|- AlarmSaverController.java       # Ручное-отладочное управление процессом сохранения Сообщений для процесса сохранения Модельной сессии
+|- ValueSaverController.java       # Ручное-отладочное управление процессом сохранения Значений для процесса сохранения Модельной сессии
+|- DataExchangeController.java     # Ручно-отладочный экспорт-импорт данных сессий
+/modelling/                        # Подменные классы, чтобы создавать управляемое окружение на уровне Evo-Api
+/persistence/                      # JPA-классы для работы с СУБД
+/saver/                            # Классы для процесса сохранения модельной сессии (поглощённый проект, поэтому обособлено)
+/service/
+|- ModHistService.java             # Согласующий Фасад над SessionManagerServiceImpl + ModellingService
+|- ModellingService.java           # Плеер истории, управление потоками данных, порождение прикладных сессий, слежка за ними
+|- SessionManagerServiceImpl.java  # Управление сущностями Сессия (CRUD)
+|- historyimport/                  # Классы для импорта исторических данных
+|- player/                         # Классы для Плеера Истории и Моделирования (выгрузка из Clickhouse, timeline)
+|- report/                         # Классы для построения Отчётов Гидроуклон
+|- components/
+   |- KafkaTopicRecreator.class    # Создание-удаление топиков в Kafka для Сессий
+   |- RemotesWalker.class          # Создание-удаление Прикладных сессий
+/watermark/                        # Watermark-сервис, механика владением асинхронным процессом в конкурентной среде резервных сущностей приложения
+```
+
+---
+
+# 3. Принципы работы (архитектурный обзор)
+
+## Требования к окружению
+- Настроенная Информационная Модель (вычитывается из **Redis**)
+- Возможность работы с Брокером (**Kafka**)
+- Доступ в **Clickhouse**
+
+## Для инициации Прикладных сессий нужен доступ к 4 приложениям
+- [hmi-backend](https://.../projects/EVOSCADA/repos/hmi-backend) — endpoint: `/v1/sessions`
+- [hydro-calculation](https://.../projects/EVOSCADA/repos/hydro-calculation) — endpoint: `/v1/sessions`
+- [alarm-service](https://.../projects/EVOSCADA/repos/alarm-service) — endpoint: `/v1/sessions`
+- [alarm-view-service](https://.../projects/EVOSCADA/repos/alarm-view-service) — endpoint: `/v1/sessions`
+
+В конфигурации вписываются прямые адреса каждой сущности приложения, без использования балансировщика (haProxy, nginx).
+
+---
+
+## 3.1. Пример создания Модельной сессии
+
+### [Прием POST-запроса на новую модельную сессию]
+1. Создаём сущность Сессии, присваиваем номер (таблица `session_manager_sessions`)
+2. Сессия в статусе `CREATED`
+3. Создаём Владение процессом в Watermark-сервисе (таблица `watermarks`)
+4. (в синхроне) Запускаем окружение и процесс для Плеера
+   - делегируем работу в `ModellingService.ensureRunning()`
+5. Финализация обработки запроса
+   - **OK**: Сессия переводится в статус `PAUSED`, в ответ клиенту отправляем номер сессии. Сессия активна, занимает ресурсы, поддерживается её жизнеспособность.
+   - **ERROR**: Сессия переводится в статус `CLOSED`, в ответ клиенту отправляем причину. Захваченные ресурсы освобождаем, порождённые Прикладные сессии уничтожаем.
+
+### `ModellingService.ensureRunning()`
+1. Создаст топики в Kafka (для значений и для сообщений)
+2. Инициирует Timeline (ячейки данных, которые будут пошагово перекладываться в Kafka с заданной скоростью "времени")
+3. Вычитывает и запоминает Стартовый срез данных на начало времени сессии. Отправляет срез в созданный выше набор топиков Kafka
+4. Первично обеспечивает наличие Прикладных сессий (Про вторичное создание смотри в описании Отказоустойчивости)
+5. Настраивает Курсор (положение, скорость)
+6. Если сессия в статусе `PLAYING`, запускаются циклы воспроизведения (`tick()`)
+   - Забираются данные из нужных ячеек Timeline и отправляются в набор топиков Kafka
+   - Если нужные ячейки Timeline не готовы
+     - Приостанавливается воспроизведение
+     - Выгружаются данные из Clickhouse
+     - Когда ячейки станут готовы, воспроизведение продолжится
+   - Если определим, что скоро закончатся готовые ячейки, запустим предподгрузку данных на будущие ячейки
+   - На каждой подгрузке данных производится очистка данных из ячеек, которые уже оказались в прошлом
+
+---
+
+## 3.2. Отказоустойчивость
+
+### Жизнеспособность Сессии
+Отслеживается в связке `WatermarkService` + `ModellingService`.
+
+### В случае, когда жизнь Сессии прервалась
+1. `WatermarkService` найдёт и заберёт Владение процессом Сессии
+2. передаст Владение в `ModellingService.recover()`
+3. делегирует работу в `ModellingService.ensureRunning()`, описанный выше
+
+### Слежка за наличием Прикладных сессий
+Реализована в `ModellingService`:
+- По всем активным Сессиям идёт опрос Приложений
+- В случае недостатка Прикладных сессий
+  - Обработка Сессии приостанавливается (`isHalted = true`)
+  - Производятся попытки создать Прикладные сессии
+  - Когда Прикладные сессии обеспечены, возобновляем Сессию (`isHalted = false`)
+
+---
+
+## 3.3. Прикладные сессии
+
+В описанном наборе приложений произведена существенная доработка, чтобы можно было создавать в них изолированный контекст работы. Изоляция от оперативных данных, изоляция сессий друг от друга.
+
+Прикладная сессия уведомлена про:
+- тип сессии
+- её номер
+- какие топики читать
+- какие используются спец-таблицы в Clickhouse
+- в каком теге Сигналов будет размещена информация о движении времени Сессии
+
+### Время
+Про время важно знать, т.к. нужно имитировать появление сигналов в фактическом прошлом, аналогично про Сообщения. Если Плеер прервал работу, течение времени должно остановиться и в Прикладных сессиях (это очень важно для [hydro-calculation](https://.../projects/EVOSCADA/repos/hydro-calculation)).
+
+### Тег-время
+По умолчанию `<Project_Name>:_Player.Time`, тип данных `timeVar`, должен быть создан и маршрутизирован в Информационной Модели.
+
+---
+
+## 3.4. Сохранение модельных сессий
+
+### [Прием POST-запроса на сохранение модельной сессии]
+1. Запрос принимаем в `ModHistController.saveSession()`
+2. Статус Сессии переводим в `SAVING`
+3. Уничтожаем процессы Сессии (Прикладные сессии, Плеерные потоки данных), НО ТОПИКИ KAFKA НЕ УНИЧТОЖАЕМ
+4. Создание двух Сохранятельных сессий (таблица `save_sessions`)
+   - Для Сообщений (Алармы)
+   - Для Значений
+5. Создание команды на старт процесса сохранения в сервисный топик Kafka (по-умолчанию `historySaver.commands`)
+6. Отвечаем Клиенту, что запрос на сохранение обработан (поставлен в очередь)
+
+### [Взятие в работу команды из очереди]
+1. `ServiceCommandListener.run()` инициирует подписку на сервисный топик Kafka
+2. Обработка сообщений делегируется в `ServiceCommandDispatcherImpl.handle()`
+3. Ещё раз делегируем по тем, кто реализует Интерфейс `ServiceCommandHandler<ServiceCommand>`
+   - В нашем случае это будет `StartSessionCommandHandler`, где `ServiceCommand = StartSessionCommand`
+   - Делегируем в `saver.worker.WorkerExecutorImpl.ensureRunning()`
+
+### [Процесс сохранения]
+Отказоустойчивый процесс, связка `WatermarkService` + `WorkerExecutorImpl`:
+1. Сверка статуса Сохранятельной сессии
+2. Создание Watermark-записи под Владение этим процессом
+3. Через `saver.worker.WorkerExecutorImpl.ensureRunning()` создается/восстанавливается `SessionWorker`
+   - Воркер хранит прогресс в таблице `save_session_progress`, детализация на каждую партицию топика Kafka
+   - Воркер перекладывает данные из модельного топика Kafka в спец-таблицу внутри Clickhouse, добавляя в каждую запись принадлежность к `sessionId`
+   - По окончании данных переводит Сохранятельную сессию в статус `SAVED`
+4. Уведомляет `SessionManagerServiceImpl.refreshSessionStatusFromWorker`, чтобы попытаться сменить статус основной Сессии
+   - Сверка статусов всех Сохранятельных сессий для `sessionId`
+   - Если все `SAVED`, то Сессия плеера тоже переводится в статус `SAVED`
+
+---
+
+# 3.5. Алгоритм сохранения модельной сессии (SessionWorker)
+
+## 3.5.1. Инициализация сессии сохранения
+1. `ServiceCommandListener` подписывается на сервисный топик Kafka (`historySaver.commands`)
+2. `ServiceCommandListener.onMessage()` парсит JSON-сообщение в `ServiceCommand`
+3. `ServiceCommandDispatcherImpl.handle()` находит хендлер по типу команды
+4. `StartSessionCommandHandler.handle()` вызывает `WorkerExecutorImpl.ensureRunning(sessionId, SaveSessionType.VALUE/ALARM)`
+5. `WorkerExecutorImpl.ensureRunning(sessionId, type)`:
+   - Проверяет существование сессии в `save_sessions`
+   - Если статус терминальный (SAVED, ERROR, CANCELLED) — завершает
+   - Создаёт начальное состояние ватермарка: `SaverWatermarkState.initial(sessionId, type, topic)`
+   - Вызывает `WatermarkService.tryAcquire()` для захвата владения процессом
+   - Если захват успешен — передаёт `WatermarkLease` и `SaverWatermarkState` в `ensureRunning(lease, state)`
+6. `WorkerExecutorImpl.ensureRunning(lease, state)`:
+   - Проверяет соответствие `serviceName` и `resourceKey`
+   - Создаёт пул воркеров (если ещё не создан)
+   - Создаёт ключ `WorkerKey(sessionId, type)`
+   - В `ConcurrentHashMap<WorkerKey, ActiveWorker>`:
+     - Если воркер уже запущен с тем же epoch — возвращает его
+     - Если воркер запущен другим epoch — прерывает старый и создаёт новый
+     - Поднимает новый воркер через `pool.submit(workerFactory.create(...))`
+7. `SessionWorkerFactoryImpl.create()` создаёт `SessionWorker` для VALUE или ALARM:
+   - Для VALUE: `valueMapper` (KafkaRecordMapper<SessionRecord>) и `valueWriter` (ClickHouseSessionRecordsWriter)
+   - Для ALARM: `alarmMapper` (KafkaRecordMapper<AlarmRecord>) и `alarmWriter` (ClickHouseAlarmRecordsWriter)
+
+## 3.5.2. Основной цикл SessionWorker.run()
+
+### Фаза 1: Загрузка сессии и проверка статуса
+1. `SessionWorker.run()` помещает `sessionId` в MDC для трассировки логов
+2. Загружает сессию из БД через `SaveSessionRepository.findById(entityId)`
+3. Если сессия не найдена — освобождает ватермарк и завершает
+4. Запоминает `topic` из сессии
+
+### Фаза 2: Валидация и перевод статуса в SAVING
+1. Внутри транзакции проверяет, не в терминальном ли статусе сессия
+2. Если статус `CREATED` — переводит в `SAVING`
+3. Если статус уже `SAVING` или `CANCELLING` — сбрасывает ошибки и продолжает
+4. Очищает поля `errorCode`, `errorMessage`, `finishedAt`
+5. Сохраняет сессию в БД
+
+### Фаза 3: Получение метаданных топика и вычисление целевых офсетов
+1. Создаёт Kafka-консьюмер с изолированным `group.id = "historySaver-source-" + sessionId`
+2. Запрашивает список партиций топика через `consumer.partitionsFor(topic)`
+3. Если партиций нет — переводит сессию в `FAILED` с кодом `TOPIC_NOT_FOUND`
+4. Формирует список `TopicPartition` для ручного назначения
+5. Вычисляет целевые офсеты:
+   - `endOffsets` — офсет следующей записи, которая будет добавлена
+   - `beginningOffsets` — наименьший доступный офсет
+   - `target = endOffset - 1` (последняя существующая запись)
+   - Если `endOffset <= 0` или `begin >= end` — `target = -1` (партиция пуста)
+6. Логгирует количество сообщений для чтения по всем партициям
+
+### Фаза 4: Инициализация/восстановление прогресса по партициям
+1. Загружает существующие записи `SaveSessionProgressEntity` из БД
+2. Для каждой партиции топика:
+   - Если записи прогресса нет — создаёт новую с `lastFlushedOffset = -1`
+   - Обновляет `targetHighWatermark` до вычисленного `target`
+3. Сохраняет все записи прогресса в БД
+4. Сохраняет состояние ватермарка через `saveWatermarkState()`
+
+### Фаза 5: Позиционирование консьюмера
+1. Для каждой партиции:
+   - Загружает `lastFlushedOffset` из прогресса
+   - Вычисляет `startOffset = max(beginningOffset, lastFlushedOffset + 1)`
+   - Вычисляет `endExclusive = target + 1`
+2. Если `endExclusive <= 0` или `startOffset >= endExclusive` — партиция уже завершена:
+   - Добавляет в `donePartitions`
+   - Ставит консьюмер на паузу через `consumer.pause(List.of(tp))`
+3. Для остальных партиций позиционирует консьюмер: `consumer.seek(tp, startOffset)`
+4. Логгирует начальное состояние: сколько партиций уже завершено
+
+### Фаза 6: Основной цикл чтения и записи
+Цикл работает пока `donePartitions.size() < partitions.size()`:
+
+1. **Проверка таймаута**:
+   - Если `Duration.between(startedAt, now).compareTo(maxRuntime) > 0` — флаг `timeout = true`
+
+2. **Проверка статуса отмены**:
+   - Раз в `statusCheckEvery` проверяет статус сессии в БД
+   - Если статус `CANCELLING` — флаг `cancelling = true`
+
+3. **Выход при отмене/таймауте**:
+   - Если `cancelling || timeout` и `batch.isEmpty()` — выходит из цикла
+
+4. **Чтение записей из Kafka**:
+   - `ConsumerRecords<TnMsg.Key, TnMsg.Msg> records = consumer.poll(pollTimeout)`
+   - Если `polledCount == 0` — увеличивает `emptyPollCount`
+   - Иначе — сбрасывает `emptyPollCount`
+
+5. **Обработка записей**:
+   - Для каждой записи:
+     - Проверяет, не превышает ли офсет `target` — если да, пропускает и увеличивает `skippedBeyondTarget`
+     - Преобразует сырую запись через `mapper.map(sessionId, r)` в `SessionRecord`/`AlarmRecord`
+     - Добавляет в `batch`
+     - Обновляет `totalRecordsProcessed`
+     - Обновляет `batchMaxOffset.merge(r.partition(), r.offset(), Math::max)`
+   - Если `batch.size() >= batchSize` — вызывает `flush(batch, batchMaxOffset, progressByPartition)`
+
+6. **Сброс батча (flush)**:
+   - `writer.writeBatch(batch)` — записывает в ClickHouse
+   - Если запись упала — бросает `RuntimeException("Ошибка записи в ClickHouse")`
+   - Внутри транзакции обновляет `lastFlushedOffset` для всех затронутых партиций
+   - Очищает `batch` и `batchMaxOffset`
+
+7. **Определение завершённых партиций**:
+   - Для каждой партиции:
+     - Если `lastFlushedOffset >= target` — добавляет в `donePartitions`
+     - Ставит на паузу через `consumer.pause(List.of(tp))`
+   - Логгирует количество завершённых партиций
+
+8. **Обработка записей за пределами target**:
+   - Если `skippedBeyondTarget > 0` и `!batch.isEmpty()` — сразу сбрасывает батч
+   - Если `records.isEmpty() && !batch.isEmpty()` — тоже сбрасывает батч
+
+### Фаза 7: Завершение сессии
+1. После выхода из цикла:
+   - Если `cancelling` — завершает со статусом `CANCELLED`
+   - Если `timeout` — завершает со статусом `ERROR` и кодом `TIMEOUT`
+   - Иначе — завершает со статусом `SAVED`
+2. Вызывает `refreshManagerStatus()` — обновляет статус в `session_manager`
+3. Освобождает ватермарк через `releaseWatermark()`
+
+### Обработка исключений
+1. `OffsetOutOfRangeException` — офсет удалён из Kafka (retention):
+   - Переводит сессию в `FAILED` с кодом `OFFSET_OUT_OF_RANGE`
+   - Освобождает ватермарк
+2. `IllegalStateException` — сессия уже в терминальном статусе:
+   - Освобождает ватермарк
+3. `LostWatermarkOwnershipException` — потерял владение ватермарком:
+   - Освобождает ватермарк
+4. `RuntimeException` с сообщением "Ошибка записи в ClickHouse":
+   - Переводит сессию в `FAILED` с кодом `CLICKHOUSE_WRITE_ERROR`
+5. Все остальные `Exception` — трактуется как ошибка чтения из Kafka:
+   - Переводит сессию в `FAILED` с кодом `KAFKA_READ_ERROR`
+
+## 3.5.3. Управление ватермарком
+1. `renewWatermarkIfNeeded(now)`:
+   - Если `Duration.between(lastWatermarkTouch, now) < watermarkRenewEvery` — пропускает
+   - Иначе вызывает `watermarkService.renew(lease)`
+   - Если renewal отклонён — бросает `LostWatermarkOwnershipException`
+2. `saveWatermarkState(progressByPartition)`:
+   - Создаёт `SaverWatermarkState.fromProgress(...)`
+   - Вызывает `watermarkService.saveState(lease, state)`
+   - Если saveState отклонён — бросает `LostWatermarkOwnershipException`
+3. `releaseWatermark()`:
+   - Вызывает `watermarkService.release(lease)`
+   - Логгирует предупреждение, если release отклонён
+
+## 3.5.4. Статусы сессии сохранения
+| Статус | Описание |
+|--------|----------|
+| `CREATED` | Сессия создана, ожидает запуска |
+| `SAVING` | Воркер запущен, данные читаются из Kafka |
+| `SAVED` | Все данные записаны в ClickHouse |
+| `CANCELLING` | Запрошена отмена пользователем |
+| `CANCELLED` | Сессия отменена |
+| `ERROR` | Ошибка выполнения (timeout, clickhouse error, kafka error) |
+
+---
+
+# 4. Развёртывание
+## 3.6. Алгоритм импорта данных из ZIP-архива (DataExchangeService.importFromZip)
+
+### 3.6.1. Парсинг архива
+1. `parseArchive(zipStream)`:
+   - Читает все файлы из ZIP-архива
+   - Ожидает наличие: `metadata.json`, `session_metadata.json`, `session_records.json`, `alarm_records.json`
+   - Если файл отсутствует — бросает `ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARCHIVE", ...)`
+2. `ExportMetadata` — содержит `sessionId`, `sessionRecordsCount`, `alarmRecordsCount`
+3. `SessionMetadataDto` — содержит:
+   - `name`, `mode`, `source`, `startTime`, `endTime`, `durationSeconds`, `status`, `errorMessage`
+   - `topicValue`, `topicAlarm`, `createdAt`
+   - `userId`, `userName`, `created_dto`, `meta`
+4. `SessionRecord` и `AlarmRecord` — списки записей
+
+### 3.6.2. Обработка сессии
+1. Если `overwrite = true`:
+   - Проверяет существование сессии в БД
+   - Если есть — удаляет партиции в ClickHouse через `partitionService.dropPartitionIfExists()`
+   - Обновляет существующую запись `SessionManagerEntity` или создаёт новую
+   - Сохраняет в БД
+2. Если `overwrite = false`:
+   - Создаёт новую запись `SessionManagerEntity`
+3. Применяет метаданные из архива:
+   - `setSource(SourceMode.imported)`
+   - `setUserId(userInfo.getId())`
+   - `setUserName(userInfo.getFullName())`
+   - `setCreatedAt(Instant.now())`
+4. Если `targetSessionId != originalSessionId` — обновляет `sessionId` у всех записей
+
+### 3.6.3. Запись в ClickHouse
+1. `writeInBatches(records, writer)`:
+   - Делит список на батчи по `WRITE_BATCH_SIZE = 10_000`
+   - Для каждого батча вызывает `writer.writeBatch(batch)`
+2. `ClickHouseSessionRecordsWriter.writeBatch()` и `ClickHouseAlarmRecordsWriter.writeBatch()` — записывают в соответствующие таблицы ClickHouse
+
+### 3.6.4. Экспорт сессии в ZIP (DataExchangeService.exportToZip)
+1. `exportToZip(sessionId, userInfo)`:
+   - Загружает сессию из БД через `SessionManagerRepository.findById()`
+   - Читает записи из ClickHouse: `recordReader.readSessionRecords(sessionId)`, `readAlarmRecords(sessionId)`
+2. Создаёт ZIP-архив:
+   - `metadata.json` — `ExportMetadata(sessionId, sessionRecords.size(), alarmRecords.size())`
+   - `session_metadata.json` — `SessionMetadataDto` из `SessionManagerEntity`
+   - `session_records.json` — список `SessionRecord`
+   - `alarm_records.json` — список `AlarmRecord`
+3. Возвращает байтовый массив ZIP-архива
+
+---
+
+# 5. Конфигурация (из docs/spring-configuration-metadata.md)
+## 3.7. Алгоритм очистки импортированных сессий (CleanupImportedSessionsCommandHandler)
+
+### 3.7.1. Запуск планировщика
+1. `@Scheduled(cron = "${tn-scada.history-model.cleanup.imported-sessions.cron}")` — запускает `CleanupImportedSessionsCommandHandler.run()`
+2. Параметры:
+   - `cron` — расписание (по умолчанию `0 0 3 * * *` — 3:00 AM каждый день)
+   - `enabled` — флаг включения (по умолчанию `true`)
+   - `lock-at-least-for` — минимальное время удержания лока (по умолчанию `PT1M`)
+   - `lock-at-most-for` — максимальное время удержания лока (по умолчанию `PT5M`)
+   - `soft` — мягкое удаление (по умолчанию `true`)
+   - `ttl` — время жизни импортированной сессии (по умолчанию `PT72H`)
+
+### 3.7.2. Логика очистки
+1. Запрашивает у `WatermarkService` владение ресурсом `resourceKey = "importedSessionsCleanup"`
+2. Если захват лока не удался — пропускает итерацию
+3. Загружает импортированные сессии из БД:
+   - Фильтрует по `source = SourceMode.imported`
+   - Фильтрует по `createdAt + ttl > now`
+4. Для каждой сессии:
+   - Проверяет, не в процессе ли она сохранения (`status != SAVING && status != CANCELLING`)
+   - Если статус терминальный — удаляет:
+     - Если `soft = true` — ставит статус `DELETED`
+     - Если `soft = false` — полностью удаляет из БД
+   - Удаляет партиции в ClickHouse через `partitionService.dropPartitionIfExists()`
+5. После обработки всех сессий — освобождает лока ватермарка
+
+---
+
+# 6. Алгоритмы (дополнительно)
+
+## 6.1. Watermark-сервис
+
+### 6.1.1. Захват ватермарка (WatermarkService.tryAcquire)
+1. Сериализует начальное состояние в JSON
+2. Вычисляет `leaseUntil = now + leaseDuration`
+3. Вызывает `WatermarkRepository.acquire(serviceName, resourceKey, stateJson, nodeId, leaseUntil)`
+4. SQL-запрос:
+   ```sql
+   INSERT INTO watermarks (service_name, resource_key, state_json, owner_node_id, lease_until, created_at, updated_at)
+   VALUES (?, ?, ?, ?, ?, now(), now())
+   ON CONFLICT (service_name, resource_key) DO UPDATE
+   SET owner_node_id = excluded.owner_node_id,
+       lease_until = excluded.lease_until,
+       epoch = CASE
+           WHEN watermarks.owner_node_id = excluded.owner_node_id
+               AND watermarks.lease_until >= now() THEN watermarks.epoch
+           ELSE nextval('watermark_epoch_seq')
+       END,
+       updated_at = now()
+   WHERE watermarks.lease_until < now()
+      OR (watermarks.owner_node_id = excluded.owner_node_id
+          AND watermarks.lease_until >= now())
+   RETURNING ...
+   ```
+5. Если запись уже существует и принадлежит той же ноде с неистекшим lease — обновляет epoch
+6. Возвращает `WatermarkAcquisition(lease, snapshot)`
+
+### 6.1.2. Продление ватермарка (WatermarkService.renew)
+1. Вычисляет `leaseUntil = now + leaseDuration`
+2. Вызывает `WatermarkRepository.renew(serviceName, resourceKey, nodeId, epoch, leaseUntil)`
+3. SQL-запрос:
+   ```sql
+   UPDATE watermarks
+   SET lease_until = ?, updated_at = now()
+   WHERE service_name = ?
+     AND resource_key = ?
+     AND owner_node_id = ?
+     AND epoch = ?
+     AND lease_until >= now()
+   ```
+4. Возвращает `true` если обновлено 1 запись, иначе `false`
+
+### 6.1.3. Сохранение состояния (WatermarkService.saveState)
+1. Сериализует состояние в JSON
+2. Вызывает `WatermarkRepository.saveState(serviceName, resourceKey, nodeId, epoch, stateJson, leaseUntil)`
+3. SQL-запрос:
+   ```sql
+   UPDATE watermarks
+   SET state_json = ?, lease_until = ?, updated_at = now()
+   WHERE service_name = ?
+     AND resource_key = ?
+     AND owner_node_id = ?
+     AND epoch = ?
+     AND lease_until >= now()
+   ```
+4. Возвращает `true` если обновлено 1 запись, иначе `false`
+
+### 6.1.4. Освобождение ватермарка (WatermarkService.release)
+1. Вызывает `WatermarkRepository.release(serviceName, resourceKey, nodeId, epoch)`
+2. SQL-запрос:
+   ```sql
+   DELETE FROM watermarks
+   WHERE service_name = ?
+     AND resource_key = ?
+     AND owner_node_id = ?
+     AND epoch = ?
+     AND lease_until >= now()
+   ```
+3. Возвращает `true` если удалена 1 запись, иначе `false`
+
+### 6.1.5. Поиск истекших ватермарков (WatermarkService.findExpired)
+1. Вызывает `WatermarkRepository.findExpired(now)`
+2. SQL-запрос:
+   ```sql
+   SELECT ...
+   FROM watermarks
+   WHERE lease_until < ?
+   ORDER BY lease_until ASC
+   ```
+
+### 6.1.6. Recovery истекших ватермарков (WatermarkRecoveryService.recoverExpired)
+1. Запускается по расписанию `@Scheduled(fixedDelayString = "${tn-scada.history-model.watermark.recovery-scan-interval}")`
+2. Вызывает `WatermarkService.findExpired(now)`
+3. Для каждого истекшего ватермарка:
+   - Находит хендлер по `serviceName`
+   - Вызывает `WatermarkService.tryAcquire(serviceName, resourceKey, stateJson)`
+   - Если захват успешен — вызывает `handler.recover(lease, snapshot)`
+   - Если захват проиграл гонку — пропускает
+
+## 6.2. WorkerExecutor
+
+### 6.2.1. ensureRunning(sessionId, type)
+1. Проверяет существование сессии в БД
+2. Если статус терминальный — возвращает
+3. Создаёт начальное состояние ватермарка
+4. Вызывает `WatermarkService.tryAcquire(SERVICE_NAME, resourceKey, initialState)`
+5. Если захват успешен — вызывает `ensureRunning(lease, initialState)`
+
+### 6.2.2. ensureRunning(lease, state)
+1. Проверяет соответствие `serviceName` и `resourceKey`
+2. Создаёт пул воркеров (если ещё не создан)
+3. Создаёт ключ `WorkerKey(sessionId, type)`
+4. В `ConcurrentHashMap`:
+   - Если воркер уже запущен с тем же epoch — возвращает его
+   - Если воркер запущен другим epoch — прерывает старый и создаёт новый
+   - Поднимает новый воркер через `pool.submit(workerFactory.create(...))`
+
+### 6.2.3. requestCancel(sessionId, type)
+1. Загружает сессию из БД
+2. Если статус `SAVING` или `CREATED` — переводит в `CANCELLING`
+3. Вызывает `ensureRunning(sessionId, type)` — гарантирует, что воркер проснётся и корректно завершится
+
+## 6.3. Kafka-команды
+
+### 6.3.1. ServiceCommand (базовый интерфейс)
+- `CURRENT_VERSION = 1`
+- `v()` — версия команды
+- `createdAt()` — время создания
+- `partitionKey()` — ключ партиционирования (по умолчанию 0)
+- `printInfo()` — строковое представление для логов
+- `@JsonTypeInfo` + `@JsonSubTypes` — сериализация по типу
+
+### 6.3.2. StartSessionCommand
+- Поля: `v`, `sessionType`, `sessionId`, `topic`, `createdAt`
+- `partitionKey() = sessionId` — гарантирует упорядоченность команд одной сессии
+- `of(sessionId, sessionType, topic)` — фабрика создания
+
+### 6.3.3. CancelSessionCommand
+- Поля: `v`, `sessionType`, `sessionId`, `createdAt`
+- `partitionKey() = sessionId`
+- `of(sessionId, sessionType)` — фабрика создания
+
+### 6.3.4. CleanupImportedSessionsCommand
+- Поля: `v`, `createdAt`
+- Глобальная команда (не привязана к сессии)
+
+### 6.3.5. ServiceCommandDispatcherImpl
+1. Конструктор принимает `List<ServiceCommandHandler>`
+2. Создаёт `Map<Class, Handler>` — каждый тип команды должен иметь ровно один хендлер
+3. `handle(command)`:
+   - Проверяет версию команды
+   - Находит хендлер по типу команды
+   - Вызывает `handler.handle(command)`
+
+### 6.3.6. ServiceCommandListener
+1. Подписывается на сервисный топик Kafka
+2. `run(args)`:
+   - Создаёт `DefaultKafkaConsumerFactory` с consumer configs
+   - Настраивает `ConcurrentKafkaListenerContainerFactory`:
+     - `setSyncCommits(true)`
+     - `setAckMode(MANUAL_IMMEDIATE)`
+     - `setConcurrency(1)`
+   - Создаёт `ConcurrentMessageListenerContainer`
+   - Регистрирует listener:
+     - Обёртывает вызов `onMessage` в `ExecutorService`
+     - При ошибке — логгирует и не ack-ит сообщение
+3. `onMessage(key, msg)`:
+   - Парсит JSON в `ServiceCommand`
+   - Вызывает `dispatcher.handle(command)`
+4. `shutdown()`:
+   - Закрывает `ExecutorService`
+
+## 6.4. SessionWorker — детальный алгоритм
+
+### 6.4.1. Структура данных
+- `sessionId` — идентификатор сессии
+- `saveSessionType` — тип сессии (VALUE/ALARM)
+- `props` — `WorkerProperties` (batchSize, pollTimeout, maxRuntime, statusCheckEvery)
+- `consumerFactory` — фабрика Kafka-консьюмеров
+- `mapper` — `KafkaRecordMapper<R>` (преобразует сырую запись в `SessionRecord`/`AlarmRecord`)
+- `writer` — `RecordWriter<R>` (записывает батчи в ClickHouse)
+- `saveSessionRepository` — доступ к `save_sessions`
+- `progressRepository` — доступ к `save_session_progress`
+- `tx` — `TransactionTemplate`
+- `watermarkService` — сервис ватермарков
+- `watermarkLease` — текущее владение
+- `watermarkRenewEvery` — интервал продления
+- `lastWatermarkTouch` — время последнего обновления
+
+### 6.4.2. Цикл чтения
+```
+while (donePartitions.size() < partitions.size()) {
+    pollIteration++
+    renewWatermarkIfNeeded(now)
+
+    if (timeout) {
+        timeout = true
+        log.warn("Таймаут сессии достигнут")
+    }
+
+    if (statusCheckEvery) {
+        lastStatusCheck = now
+        status = saveSessionRepository.findById(entityId).map(SaveSessionEntity::getStatus).orElse(ERROR)
+        if (status == CANCELLING) {
+            cancelling = true
+        }
+    }
+
+    if ((cancelling || timeout) && batch.isEmpty()) {
+        break
+    }
+
+    records = consumer.poll(pollTimeout)
+    polledCount = records.count()
+
+    if (polledCount == 0) {
+        emptyPollCount++
+    } else {
+        emptyPollCount = 0
+    }
+
+    for (r : records) {
+        if (r.offset() > target) {
+            skippedBeyondTarget++
+            continue
+        }
+
+        mapped = mapper.map(sessionId, r)
+        batch.add(mapped)
+        totalRecordsProcessed++
+        batchMaxOffset.merge(r.partition(), r.offset(), Math::max)
+
+        if (batch.size() >= batchSize) {
+            flush(batch, batchMaxOffset, progressByPartition)
+            updateDoneAndPause(partitions, donePartitions, progressByPartition, targets, consumer)
+        }
+    }
+
+    if (skippedBeyondTarget > 0 && !batch.isEmpty()) {
+        flush(batch, batchMaxOffset, progressByPartition)
+        updateDoneAndPause(...)
+    }
+
+    if (records.isEmpty() && !batch.isEmpty()) {
+        flush(batch, batchMaxOffset, progressByPartition)
+        updateDoneAndPause(...)
+    }
+}
+```
+
+### 6.4.3. Функция flush
+```
+flush(batch, batchMaxOffset, progressByPartition) {
+    writer.writeBatch(batch)  // Если упадёт — бросает RuntimeException
+
+    tx.executeWithoutResult(status -> {
+        for (partition, maxOffset : batchMaxOffset) {
+            p = progressByPartition.get(partition)
+            if (p != null && maxOffset > p.lastFlushedOffset) {
+                p.lastFlushedOffset = maxOffset
+            }
+        }
+        progressRepository.saveAll(progressByPartition.values())
+    })
+
+    saveWatermarkState(progressByPartition)
+    batch.clear()
+    batchMaxOffset.clear()
+}
+```
+
+### 6.4.4. Функция updateDoneAndPause
+```
+updateDoneAndPause(partitions, donePartitions, progressByPartition, targets, consumer) {
+    toPause = []
+    for (tp : partitions) {
+        if (donePartitions.contains(tp.partition())) {
+            continue
+        }
+        p = progressByPartition.get(tp.partition())
+        if (p != null && p.lastFlushedOffset >= targets.get(tp.partition())) {
+            donePartitions.add(tp.partition())
+            toPause.add(tp)
+        }
+    }
+
+    if (!toPause.isEmpty()) {
+        consumer.pause(toPause)
+    }
+}
+```
+
+### 6.4.5. Функция finish
+```
+finish(status, code, message) {
+    tx.executeWithoutResult(s -> {
+        current = saveSessionRepository.findById(entityId).orElseThrow()
+        current.setStatus(status)
+        current.setFinishedAt(now())
+        current.setErrorCode(code == null ? null : code.name())
+        current.setErrorMessage(message)
+        saveSessionRepository.save(current)
+    })
+    refreshManagerStatus()
+    log.info("Сессия {} завершена со статусом {}", sessionId, status)
+}
+```
+
+### 6.4.6. Функция fail
+```
+fail(code, message) {
+    tx.executeWithoutResult(s -> {
+        current = saveSessionRepository.findById(entityId).orElse(null)
+        if (current == null) {
+            return
+        }
+        current.setStatus(ERROR)
+        current.setFinishedAt(now())
+        current.setErrorCode(code.name())
+        current.setErrorMessage(message)
+        saveSessionRepository.save(current)
+    })
+    refreshManagerStatus()
+    log.info("Сессия {} помечена как FAILED с errorCode={}", sessionId, code)
+}
+```
+
+## 6.5. ExportMetadata / ImportResult
+
+### 6.5.1. ExportMetadata
+- `sessionId` — идентификатор сессии
+- `sessionRecordsCount` — количество записей значений
+- `alarmRecordsCount` — количество записей алармов
+
+### 6.5.2. ImportResult
+- `sessionId` — идентификатор сессии после импорта
+- `sessionRecordsImported` — количество импортированных записей значений
+- `alarmRecordsImported` — количество импортированных записей алармов
+- `overwritten` — флаг, была ли перезаписана существующая сессия
+
+---
+
+# 8. Алгоритмы (дополнительно)
+
+## 8.1. DataExchangeService
+
+### 8.1.1. exportToZip(sessionId, userInfo)
+1. Загружает сессию из БД через `SessionManagerRepository.findById()`
+2. Читает записи из ClickHouse:
+   - `recordReader.readSessionRecords(sessionId)` — значения
+   - `recordReader.readAlarmRecords(sessionId)` — алармы
+3. Создаёт ZIP-архив:
+   - `metadata.json` — `ExportMetadata(sessionId, sessionRecords.size(), alarmRecords.size())`
+   - `session_metadata.json` — `SessionMetadataDto` из `SessionManagerEntity`
+   - `session_records.json` — список `SessionRecord`
+   - `alarm_records.json` — список `AlarmRecord`
+4. Возвращает байтовый массив ZIP-архива
+
+### 8.1.2. importFromZip(zipStream, userInfo, overwrite)
+1. `parseArchive(zipStream)`:
+   - Читает все файлы из ZIP-архива
+   - Ожидает наличие: `metadata.json`, `session_metadata.json`, `session_records.json`, `alarm_records.json`
+   - Если файл отсутствует — бросает `ApiException(HttpStatus.BAD_REQUEST, "INVALID_ARCHIVE", ...)`
+2. `ExportMetadata` — содержит `sessionId`, `sessionRecordsCount`, `alarmRecordsCount`
+3. `SessionMetadataDto` — содержит:
+   - `name`, `mode`, `source`, `startTime`, `endTime`, `durationSeconds`, `status`, `errorMessage`
+   - `topicValue`, `topicAlarm`, `createdAt`
+   - `userId`, `userName`, `created_dto`, `meta`
+4. `SessionRecord` и `AlarmRecord` — списки записей
+5. Обработка сессии:
+   - Если `overwrite = true`:
+     - Проверяет существование сессии в БД
+     - Если есть — удаляет партиции в ClickHouse через `partitionService.dropPartitionIfExists()`
+     - Обновляет существующую запись `SessionManagerEntity` или создаёт новую
+     - Сохраняет в БД
+   - Если `overwrite = false`:
+     - Создаёт новую запись `SessionManagerEntity`
+6. Применяет метаданные из архива:
+   - `setSource(SourceMode.imported)`
+   - `setUserId(userInfo.getId())`
+   - `setUserName(userInfo.getFullName())`
+   - `setCreatedAt(Instant.now())`
+7. Если `targetSessionId != originalSessionId` — обновляет `sessionId` у всех записей
+8. Запись в ClickHouse:
+   - `writeInBatches(records, writer)`:
+     - Делит список на батчи по `WRITE_BATCH_SIZE = 10_000`
+     - Для каждого батча вызывает `writer.writeBatch(batch)`
+   - `ClickHouseSessionRecordsWriter.writeBatch()` и `ClickHouseAlarmRecordsWriter.writeBatch()` — записывают в соответствующие таблицы ClickHouse
+
+## 8.2. CleanupImportedSessionsCommandHandler
+
+### 8.2.1. Запуск планировщика
+1. `@Scheduled(cron = "${tn-scada.history-model.cleanup.imported-sessions.cron}")` — запускает `CleanupImportedSessionsCommandHandler.run()`
+2. Параметры:
+   - `cron` — расписание (по умолчанию `0 0 3 * * *` — 3:00 AM каждый день)
+   - `enabled` — флаг включения (по умолчанию `true`)
+   - `lock-at-least-for` — минимальное время удержания лока (по умолчанию `PT1M`)
+   - `lock-at-most-for` — максимальное время удержания лока (по умолчанию `PT5M`)
+   - `soft` — мягкое удаление (по умолчанию `true`)
+   - `ttl` — время жизни импортированной сессии (по умолчанию `PT72H`)
+
+### 8.2.2. Логика очистки
+1. Запрашивает у `WatermarkService` владение ресурсом `resourceKey = "importedSessionsCleanup"`
+2. Если захват лока не удался — пропускает итерацию
+3. Загружает импортированные сессии из БД:
+   - Фильтрует по `source = SourceMode.imported`
+   - Фильтрует по `createdAt + ttl > now`
+4. Для каждой сессии:
+   - Проверяет, не в процессе ли она сохранения (`status != SAVING && status != CANCELLING`)
+   - Если статус терминальный — удаляет:
+     - Если `soft = true` — ставит статус `DELETED`
+     - Если `soft = false` — полностью удаляет из БД
+   - Удаляет партиции в ClickHouse через `partitionService.dropPartitionIfExists()`
+5. После обработки всех сессий — освобождает лока ватермарка
+
+---
+
+## Параметры
+- Префикс параметров в приложении: **tn-scada.history-model** и **tn-scada.datasource-saver**
+- Настройка участвует параметры от Spring-Boot, Evo-Manager
+- Перечень настроек смотреть в [автодокументации по параметрам настроек](./docs/spring-configuration-metadata.md)
+
+---
+
+# 5. Конфигурация (из docs/spring-configuration-metadata.md)
+
+## tn-scada.datasource-saver.alarm-table
+- Имя таблицы в Clickhouse для сохранения Модельных сессий. Для сообщений
+- Тип данных: `String`
+- Значение по умолчанию: `alarmRecords`
+
+## tn-scada.datasource-saver.db
+- Database-пространство в Clickhouse для сохранения Модельных сессий
+- Тип данных: `String`
+- Значение по умолчанию: `db`
+
+## tn-scada.datasource-saver.hikari.maximum-pool-size
+- Ограничение множества соединений при сохранении Модельных сессий
+- Тип данных: `Integer`
+
+## tn-scada.datasource-saver.password
+- Пароль доступа к Clickhouse для сохранения Модельных сессий
+- Тип данных: `String`
+- Переопределение в yml: `<пустая строка>`
+
+## tn-scada.datasource-saver.url
+- URL доступа к Clickhouse для сохранения Модельных сессий
+- Тип данных: `String`
+- Переопределение в yml: `<пустая строка>`
+
+## tn-scada.datasource-saver.username
+- Учётная запись доступа к Clickhouse для сохранения Модельных сессий
+- Тип данных: `String`
+- Переопределение в yml: `<пустая строка>`
+
+## tn-scada.datasource-saver.value-table
+- Имя таблицы в Clickhouse для сохранения Модельных сессий. Для значений сигналов
+- Тип данных: `String`
+- Значение по умолчанию: `valueRecords`
+
+## tn-scada.history-model.alarm-service-list
+- Прямые URL доступа к Alarm-Service; Список, через запятую
+- Тип данных: `String`
+- Переопределение в yml: `<пустая строка>`
+
+## tn-scada.history-model.alarm-view-service-list
+- Прямые URL доступа к Alarm-View-Service; Список, через запятую
+- Тип данных: `String`
+- Переопределение в yml: `<пустая строка>`
+
+## tn-scada.history-model.cleanup.imported-sessions.cron
+- Расписание запуска планировщика
+- Тип данных: `String`
+- Значение по умолчанию: `0 0 3 * * *`
+- Переопределение в yml: `0 0 0 * * *`
+
+## tn-scada.history-model.cleanup.imported-sessions.enabled
+- Включить очистку
+- Тип данных: `Boolean`
+- Значение по умолчанию: `true`
+
+## tn-scada.history-model.cleanup.imported-sessions.lock-at-least-for
+- Минимальное время удержания лока
+- Тип данных: `Duration`
+- Значение по умолчанию: `PT1M`
+- Переопределение в yml: `PT30S`
+
+## tn-scada.history-model.cleanup.imported-sessions.lock-at-most-for
+- Максимальное время удержания лока
+- Тип данных: `Duration`
+- Значение по умолчанию: `PT5M`
+- Переопределение в yml: `PT50S`
+
+## tn-scada.history-model.cleanup.imported-sessions.soft
+- Включить мягкое удаление (записи в БД остаются но с статусом DELETED)
+- Тип данных: `Boolean`
+- Значение по умолчанию: `true`
+
+## tn-scada.history-model.cleanup.imported-sessions.ttl
+- Время жизни импортированной сессии
+- Тип данных: `Duration`
+- Значение по умолчанию: `PT72H`
+- Переопределение в yml: `P7D`
+
+## tn-scada.history-model.fetch-optimized-enabled
+- Активация оптимизированных выборок из Clickhouse (Нужна подготовка окружения для snapshot-запросов)
+- Тип данных: `Boolean`
+- Значение по умолчанию: `true`
+
+## tn-scada.history-model.hmi-backend-list
+- Прямые URL доступа к Hmi-Backend; Список, через запятую
+- Тип данных: `String`
+- Переопределение в yml: `<пустая строка>`
+
+## tn-scada.history-model.hydro-calculation-list
+- Прямые URL доступа к Hydro-Calculation; Список, через запятую
+- Тип данных: `String`
+- Переопределение в yml: `<пустая строка>`
+
+## tn-scada.history-model.kafka.service-topic
+- Топик в Kafka для обслуживания сервисных команд (топик для работы этого приложения)
+- Тип данных: `String`
+- Значение по умолчанию: `historySaver.commands`
+
+## tn-scada.history-model.model-topic-prefix
+- Префикс для сессионных топиков в Кафке
+- Тип данных: `String`
+- Значение по умолчанию: `model-session-`
+
+## tn-scada.history-model.player-batch-limit
+- Число записей за одну вычитку из Clickhouse
+- Тип данных: `Integer`
+- Значение по умолчанию: `100000`
+
+## tn-scada.history-model.player-preload-ticks
+- Число секунд воспроизведения, для предвыгрузки из Clickhouse
+- Тип данных: `Integer`
+- Значение по умолчанию: `300`
+
+## tn-scada.history-model.remote-session-check-interval
+- Интервал сверки наличия Прикладных сессий под активные Сессии
+- Тип данных: `Duration`
+- Значение по умолчанию: `PT10S`
+
+## tn-scada.history-model.report.alarm-history-max-page-size
+- Размер порции выгрузки Сообщений
+- Тип данных: `Integer`
+- Значение по умолчанию: `10000`
+
+## tn-scada.history-model.report.alarm-view-service-haproxy-url
+- URL доступа к Alarm-View-Service. Допустимо указывать балансируемый адрес. Протокол://сервер
+- Тип данных: `String`
+- Переопределение в yml: `<пустая строка>`
+
+## tn-scada.history-model.report.messages-template-path
+- Шаблон Сообщений в отчёте
+- Тип данных: `String`
+- Значение по умолчанию: `templates/reportMessagesTemplate.xlsx`
+
+## tn-scada.history-model.report.template-path
+- Шаблон документа отчёта
+- Тип данных: `String`
+- Значение по умолчанию: `templates/reportTemplate.xlsx`
+
+## tn-scada.history-model.report.time-zone
+- В какой часовой пояс приводить Дату и Время внутри отчёта
+- Тип данных: `String`
+- Значение по умолчанию: `Europe/Moscow`
+
+## tn-scada.history-model.time-tag
+- Тег для вещания времени для Прикладных сессий, без уточнения названия проекта
+- Тип данных: `String`
+- Значение по умолчанию: `_Player.Time`
+
+## tn-scada.history-model.watermark.lease-duration
+- Длительность итерации владения процессом
+- Тип данных: `Duration`
+- Значение по умолчанию: `PT10S`
+
+## tn-scada.history-model.watermark.node-id
+- ID сущности приложения. Если не указать, будет случайная строка
+- Тип данных: `String`
+- Переопределение в yml: `${HOSTNAME}`
+
+## tn-scada.history-model.watermark.recovery-scan-interval
+- Интервал поиска процессов, у которых просрочено Владение
+- Тип данных: `Duration`
+- Значение по умолчанию: `PT4S`
+
+## tn-scada.history-model.worker.batch-size
+- Сколько сообщений копить из Kafka перед записью в Clickhouse, для сохранения Модельных сессий
+- Тип данных: `Integer`
+- Значение по умолчанию: `20000`
+
+## tn-scada.history-model.worker.max-runtime
+- Ограничение времени выполнения задания
+- Тип данных: `Duration`
+- Значение по умолчанию: `PT15M`
+
+## tn-scada.history-model.worker.max-workers
+- Число обработчиков заданий
+- Тип данных: `Integer`
+- Значение по умолчанию: `4`
+
+## tn-scada.history-model.worker.poll-timeout
+- Частота опроса Kafka в процессе сохранения Модельных сессий
+- Тип данных: `Duration`
+- Значение по умолчанию: `PT1S`
+
+## tn-scada.history-model.worker.status-check-every
+- Интервал сверки статуса задания, не отменили ли
+- Тип данных: `Duration`
+- Значение по умолчанию: `PT1S`
+
+---
+
+## Все параметры из application.yml
+
+| Параметр | Значение |
+|----------|----------|
+| alarm-service-api.type | `mock` |
+| debug | `false` |
+| evo-manager.alarm-subscription.topic | `${ALARM_TOPIC:history}` |
+| evo-manager.app-id | `${EVO_MANAGER_APP_ID}` |
+| evo-manager.diagnostic.redu.enabled | `false` |
+| evo-manager.launcher.enable | `false` |
+| evo-services.consensus-service.mock | `true` |
+| evo-services.consensus-service.type | `MOCK` |
+| logging.charset.console | `UTF-8` |
+| logging.charset.file | `UTF-8` |
+| logging.level.root | `${LOGGER_ROOT_LEVEL:WARN}` |
+| logging.level.tnt | `${LOGGER_LEVEL:INFO}` |
+| logging.pattern.console | `${LOGGER_OUTPUT_PATTERN_CONFIG:%d{ISO8601} [%X{requestId}] [%-22.22t] %highlight(%-5level) %yellow(%30.30C{1}) %msg%n%throwable}` |
+| management.endpoint.health.show-details | `always` |
+| management.endpoints.web.exposure.include | `health,info,heapdump,prometheus` |
+| server.allowed_origins | `${SERVER_ALLOWED_ORIGINS:*}` |
+| server.max-http-request-header-size | `10MB` |
+| server.port | `${WEB_SERVER_PORT}` |
+| server.shutdown | `graceful` |
+| spring.datasource.hikari.connection-timeout | `30000` |
+| spring.datasource.hikari.idle-timeout | `300000` |
+| spring.datasource.hikari.max-lifetime | `600000` |
+| spring.datasource.hikari.validation-timeout | `150000` |
+| spring.datasource.password | `${PG_DB_PASSWORD}` |
+| spring.datasource.remove-abandoned | `true` |
+| spring.datasource.remove-abandoned-timeout | `60` |
+| spring.datasource.test-while-idle | `true` |
+| spring.datasource.time-between-eviction-runs-millis | `30000` |
+| spring.datasource.url | `${PG_DB_CONNECTION_STRING}` |
+| spring.datasource.username | `${PG_DB_USERNAME}` |
+| spring.datasource.validation-query | `SELECT 1;` |
+| spring.flyway.enabled | `true` |
+| spring.jpa.hibernate.ddl-auto | `validate` |
+| spring.jpa.open-in-view | `false` |
+| spring.kafka.application-id | `${KAFKA_APPLICATION_ID_CONFIG:}` |
+| spring.kafka.bootstrap-servers | `${BOOTSTRAP_SERVERS_CONFIG:}` |
+| spring.kafka.listener.group-id | `${KAFKA_APPLICATION_ID_CONFIG:}` |
+| spring.kafka.schema-registry-url | `${SCHEMA_REGISTRY_URL_CONFIG:}` |
+| spring.kafka.ssl.enable-ssl | `${KAFKA_ENABLE_SSL:false}` |
+| spring.kafka.ssl.key-store-location | `${KAFKA_KEYSTORE_LOCATION:}` |
+| spring.kafka.ssl.key-store-password | `${KAFKA_KEYSTORE_PASSWORD:}` |
+| spring.kafka.ssl.trust-store-location | `${KAFKA_TRUSTSTORE_LOCATION:}` |
+| spring.kafka.ssl.trust-store-password | `${KAFKA_TRUSTSTORE_PASSWORD:}` |
+| spring.servlet.multipart.max-file-size | `50MB` |
+| spring.servlet.multipart.max-request-size | `50MB` |
+| springdoc.cache.disabled | `true` |
+| springdoc.swagger-ui.disable-swagger-default-url | `true` |
+| tn-scada.datasource-saver.alarm-table | `alarmRecords` |
+| tn-scada.datasource-saver.db | `db` |
+| tn-scada.datasource-saver.password | `${CH_DB_PASSWORD}` |
+| tn-scada.datasource-saver.url | `${CH_DB_CONNECTION_STRING}` |
+| tn-scada.datasource-saver.username | `${CH_DB_USERNAME}` |
+| tn-scada.datasource-saver.value-table | `valueRecords` |
+| tn-scada.datasource.database | `${DB_TYPE:clickhouse}` |
+| tn-scada.datasource.password | `${DB_PASSWORD:}` |
+| tn-scada.datasource.url | `${DB_CONNECTION_STRING}` |
+| tn-scada.datasource.username | `${DB_USERNAME:}` |
+| tn-scada.history-model.alarm-service-list | `${ALARM_SERVICE_LIST:}` |
+| tn-scada.history-model.alarm-view-service-list | `${ALARM_VIEW_SERVICE_LIST:}` |
+| tn-scada.history-model.cleanup.imported-sessions.cron | `0 0 0 * * *` |
+| tn-scada.history-model.cleanup.imported-sessions.enabled | `true` |
+| tn-scada.history-model.cleanup.imported-sessions.lock-at-least-for | `PT30S` |
+| tn-scada.history-model.cleanup.imported-sessions.lock-at-most-for | `PT50S` |
+| tn-scada.history-model.cleanup.imported-sessions.soft | `true` |
+| tn-scada.history-model.cleanup.imported-sessions.ttl | `P7D` |
+| tn-scada.history-model.fetch-optimized-enabled | `true` |
+| tn-scada.history-model.hmi-backend-list | `${HMI_BACKEND_LIST:}` |
+| tn-scada.history-model.hydro-calculation-list | `${HYDRO_CALCULATION_LIST:}` |
+| tn-scada.history-model.kafka.service-topic | `historySaver.commands` |
+| tn-scada.history-model.model-topic-prefix | `model-session-` |
+| tn-scada.history-model.player-batch-limit | `100000` |
+| tn-scada.history-model.player-preload-ticks | `300` |
+| tn-scada.history-model.remote-session-check-interval | `PT10S` |
+| tn-scada.history-model.report.alarm-history-max-page-size | `${ALARM_HISTORY_MAX_PAGE_SIZE:10000}` |
+| tn-scada.history-model.report.alarm-view-service-haproxy-url | `${ALARM_VIEW_SERVICE_HAPROXY_URL:}` |
+| tn-scada.history-model.report.messages-template-path | `${REPORT_MESSAGES_TEMPLATE_PATH:templates/reportMessagesTemplate.xlsx}` |
+| tn-scada.history-model.report.template-path | `${REPORT_TEMPLATE_PATH:templates/reportTemplate.xlsx}` |
+| tn-scada.history-model.report.time-zone | `${REPORT_TIME_ZONE:Europe/Moscow}` |
+| tn-scada.history-model.time-tag | `_Player.Time` |
+| tn-scada.history-model.watermark.lease-duration | `${WATERMARK_LEASE_DURATION:PT10S}` |
+| tn-scada.history-model.watermark.node-id | `${WATERMARK_NODE_ID:${HOSTNAME:}}` |
+| tn-scada.history-model.watermark.recovery-scan-interval | `${WATERMARK_RECOVERY_SCAN_INTERVAL:PT4S}` |
+| tn-scada.history-model.worker.batch-size | `20000` |
+| tn-scada.history-model.worker.max-runtime | `PT15M` |
+| tn-scada.history-model.worker.max-workers | `4` |
+| tn-scada.history-model.worker.poll-timeout | `PT1S` |
+| tn-scada.history-model.worker.status-check-every | `PT1S` |
+| tn-scada.kafka.bootstrap-servers | `${KAFKA_BOOTSTRAP_SERVERS}` |
+| tn-scada.kafka.listener.group-id | `historySaver-group` |
+| tn-scada.kafka.schema-registry-url | `${SCHEMA_REGISTRY_URL_CONFIG}` |
+| tn-scada.metadata.dont-show-target-project-in-names | `true` |
+| tn-scada.metadata.topic | `${TAG_METADATA_TOPIC:dm-meta}` |
+| tn-scada.redis.acl.password | `${REDIS_PASSWORD:}` |
+| tn-scada.redis.acl.sentinel-password | `${REDIS_SENTINEL_PASSWORD:}` |
+| tn-scada.redis.acl.sentinel-username | `${REDIS_SENTINEL_USERNAME:}` |
+| tn-scada.redis.acl.username | `${REDIS_USERNAME:}` |
+| tn-scada.redis.address | `${REDIS_ADDRESS}` |
+| tn-scada.redis.connection-type | `${REDIS_CONNECTION_TYPE:Cluster}` |
+| tn-scada.redis.sentinel-master | `${REDIS_SENTINEL_MASTER:}` |
+| tn-scada.redis.ssl-properties.key-store-location | `${REDIS_KEYSTORE_LOCATION:}` |
+| tn-scada.redis.ssl-properties.key-store-password | `${REDIS_KEYSTORE_PASSWORD:}` |
+| tn-scada.redis.ssl-properties.ssl | `${REDIS_ENABLE_SSL:false}` |
+| tn-scada.redis.ssl-properties.trust-store-location | `${REDIS_TRUSTSTORE_LOCATION:}` |
+| tn-scada.redis.ssl-properties.trust-store-password | `${REDIS_TRUSTSTORE_PASSWORD:}` |
+
+---
+
+## Ключевые элементы (из readme.md)
+
+```
+/controller/                       # REST-контроллеры
+|- ModHistController.java          # Работа с сессиями Плеера и Моделирования
+|- HistoryImportController.java    # Импорт потока данных, породит новую сессию, в которую и импортирует
+|- ReportController.java           # Сервис отчетов Гидроуклон
+|- AlarmSaverController.java       # Ручное-отладочное управление процессом сохранения Сообщений для процесса сохранения Модельной сессии
+|- ValueSaverController.java       # Ручное-отладочное управление процессом сохранения Значений для процесса сохранения Модельной сессии
+|- DataExchangeController.java     # Ручно-отладочный экспорт-импорт данных сессий
+/modelling/                        # Подменные классы, чтобы создавать управляемое окружение на уровне Evo-Api
+/persistence/                      # JPA-классы для работы с СУБД
+/saver/                            # Классы для процесса сохранения модельной сессии (поглощённый проект, поэтому обособлено)
+/service/
+|- ModHistService.java             # Согласующий Фасад над SessionManagerServiceImpl + ModellingService
+|- ModellingService.java           # Плеер истории, управление потоками данных, порождение прикладных сессий, слежка за ними
+|- SessionManagerServiceImpl.java  # Управление сущностями Сессия (CRUD)
+|- historyimport/                  # Классы для импорта исторических данных
+|- player/                         # Классы для Плеера Истории и Моделирования (выгрузка из Clickhouse, timeline)
+|- report/                         # Классы для построения Отчётов Гидроуклон
+|- components/
+   |- KafkaTopicRecreator.class    # Создание-удаление топиков в Kafka для Сессий
+   |- RemotesWalker.class          # Создание-удаление Прикладных сессий
+/watermark/                        # Watermark-сервис, механика владением асинхронным процессом в конкурентной среде резервных сущностей приложения
+```
+
+---
+
+## Таблицы Clickhouse (из readme.md)
+
+| Таблица | Назначение |
+|---------|------------|
+| `session_manager_sessions` | Сущность Сессии, присваивается номер |
+| `watermarks` | Владение процессом в Watermark-сервисе |
+| `save_sessions` | Сохранятельные сессии (для Сообщений и Значений) |
+| `save_session_progress` | Прогресс сохранения, детализация на каждую партицию топика Kafka |
+
+---
+
+## Топики Kafka (из readme.md)
+
+| Топик | Назначение |
+|-------|------------|
+| `historySaver.commands` | Сервисный топик для команд (по умолчанию) |
+| Модельные топики | Для значений и для сообщений (с префиксом `model-session-`) |
+
+---
+
+## Статусы Сессии (из readme.md)
+
+| Статус | Описание |
+|--------|----------|
+| `CREATED` | Сессия создана, в процессе инициализации |
+| `PAUSED` | Сессия активна, занимает ресурсы, поддерживается её жизнеспособность |
+| `CLOSED` | Сессия закрыта, ресурсы освобождены |
+| `SAVING` | Сессия в процессе сохранения |
+| `SAVED` | Сессия сохранена |
+
+---
+
+## Приложения для Прикладных сессий (из readme.md)
+
+| Приложение | URL |
+|------------|-----|
+| hmi-backend | https://.../projects/EVOSCADA/repos/hmi-backend |
+| hydro-calculation | https://.../projects/EVOSCADA/repos/hydro-calculation |
+| alarm-service | https://.../projects/EVOSCADA/repos/alarm-service |
+| alarm-view-service | https://.../projects/EVOSCADA/repos/alarm-view-service |
+
+---
+
+## Типы сессий (из readme.md)
+
+| Тип | Описание |
+|-----|----------|
+| historical + history | Плеер истории |
+| historical + saved | Воспроизведение сохраненных сессий |
+| historical + imported | Импортированный поток данных |
+| modelling | Моделирование |
+
+---
+
+## Теги (из readme.md)
+
+| Тег | Описание |
+|-----|----------|
+| `<Project_Name>:_Player.Time` | Тег-время по умолчанию, тип данных `timeVar` |
+| `_Player.Time` | Тег для вещания времени для Прикладных сессий (без уточнения названия проекта) |
+
+---
+
+## Endpoints (из readme.md)
+
+| Endpoint | Назначение |
+|----------|------------|
+| `/v1/sessions` | Создание-удаление прикладных сессий (hmi-backend, hydro-calculation, alarm-service, alarm-view-service) |
+
+---
+
+<attempt_completion>
+<result>
+Создан файл `/FUNCTIONALITY.md` с подробным описанием функциональности сервиса Воспроизведения истории и Моделирования на основе анализа:
+- `readme.md`
+- `docs/spring-configuration-metadata.md`
+
+Документ включает:
+1. Общие сведения о функциональном назначении
+2. Логическую структуру проекта
+3. Принципы работы (архитектурный обзор)
+4. Конфигурационные параметры
+5. Таблицы Clickhouse
+6. Топики Kafka
+7. Статусы Сессии
+8. Приложения для Прикладных сессий
+9. Типы сессий
+10. Теги
+11. Endpoints
+
+Проанализировано:
+- `readme.md`
+- `docs/spring-configuration-metadata.md`
+
+Ожидается:
+- (нет)
+</result>
+<task_progress>
+- [x] Начать анализ проекта
+- [x] Прочитать readme.md
+- [x] Прочитать содержимое docs/
+- [x] Создать/обновить /FUNCTIONALITY.md
+- [x] Остановиться и ждать следующий путь
+</task_progress>
+</attempt_completion>
