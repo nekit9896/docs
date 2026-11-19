@@ -218,27 +218,28 @@
 
 ---
 
-## Addendum: Setup tasks from the source roadmap (roadmap 0.27–0.39)
+## Addendum: Setup tasks (roadmap 0.27–0.39)
 
-> Added when the roadmaps were merged (D37, 2026-11-18): unique tasks of the source
-> roadmap (`confluence/old`) that had no counterparts in the main plan. The source
-> roadmap's duplicates are collapsed into existing tasks 0.1–0.26 («= old X.Y» marks
-> in `docs/plans/automation-roadmap.md`). Hours/SP estimates — in the roadmap.
-> T-numbers continue; existing T-numbers are unchanged (linked to Jira).
+> Added 2026-11-18 (D37) as part of the roadmap merge: tasks 0.27–0.39 of the
+> combined roadmap (`docs/plans/automation-roadmap.md`) that have no counterparts
+> in the main plan. Duplicate roadmap items are collapsed into existing tasks
+> 0.1–0.26 («= old X.Y» marks in `docs/plans/automation-roadmap.md`).
+> Hours/SP estimates are in the roadmap. T-numbers continue after T125;
+> existing T-numbers are unchanged (linked to Jira).
 
-- [ ] T120 [P] Requirements registry for the hydroslope (ТРП/РА) with requirement→case bindings (roadmap 0.27; deferred — D19) in `docs/specs/trace/`
-- [ ] T121 [P] Automation roadmap document (roadmap 0.28) — done: `docs/plans/automation-roadmap.md`
-- [ ] T122 [P] Test plan for hydro-calculation (roadmap 0.29) — done: `docs/confluence/test-plan-hydro-calculation.md`
-- [ ] T123 [P] Test plan for hydro-history-and-model (roadmap 0.30) — done: `docs/confluence/test-plan-hydro-history-and-model.md`
-- [ ] T124 [P] Test plan for system tests (roadmap 0.31) — done: `docs/confluence/test-plan-of-system-tests.md`
-- [ ] T125 [P] Test plan for E2E tests (roadmap 0.32)
-- [ ] T126 [P] Study hmi-backend contracts (write/read of tags) (roadmap 0.33) — summarized in `docs/specs/knowledge/hmi-backend/`
-- [ ] T127 [P] Study alarm contracts (WS/REST/Kafka/Redis) (roadmap 0.34; blocked: alarm-service docs missing — G28)
-- [ ] T128 [P] Deploy TestOps containers (Kafka, Redis, PG, CH, nginx) (roadmap 0.35)
-- [ ] T129 [P] Configure nginx for TestOps (port proxying, TLS if needed) (roadmap 0.36)
-- [ ] T130 [P] Get stand observation access: K8s namespace, Grafana, Jaeger, logging (roadmap 0.37)
-- [ ] T131 [P] Publish sdku-test-tools for reuse by test projects (wheel in Nexus, D7) (roadmap 0.38)
-- [ ] T132 [P] Implement TestOps API for uploading front-end reports (HTML/JSON) (roadmap 0.39)
+- [ ] T126 [P] Requirements registry for the hydroslope (ТРП/РА) with requirement→case bindings (roadmap 0.27; deferred — D19) in `docs/specs/trace/`
+- [ ] T127 [P] Automation roadmap document (roadmap 0.28) — done: `docs/plans/automation-roadmap.md`
+- [ ] T128 [P] Test plan for hydro-calculation (roadmap 0.29) — done: `docs/confluence/test-plan-hydro-calculation.md`
+- [ ] T129 [P] Test plan for hydro-history-and-model (roadmap 0.30) — done: `docs/confluence/test-plan-hydro-history-and-model.md`
+- [ ] T130 [P] Test plan for system tests (roadmap 0.31) — done: `docs/confluence/test-plan-of-system-tests.md`
+- [ ] T131 [P] Test plan for E2E tests (roadmap 0.32)
+- [ ] T132 [P] Study hmi-backend contracts (write/read of tags) (roadmap 0.33) — summarized in `docs/specs/knowledge/hmi-backend/`
+- [ ] T133 [P] Study alarm contracts (WS/REST/Kafka/Redis) (roadmap 0.34; blocked: alarm-service docs missing — G28)
+- [ ] T134 [P] Deploy TestOps containers (Kafka, Redis, PG, CH, nginx) (roadmap 0.35)
+- [ ] T135 [P] Configure nginx for TestOps (port proxying, TLS if needed) (roadmap 0.36)
+- [ ] T136 [P] Get stand observation access: K8s namespace, Grafana, Jaeger, logging (roadmap 0.37)
+- [ ] T137 [P] Publish sdku-test-tools for reuse by test projects (wheel in Nexus, D7) (roadmap 0.38)
+- [ ] T138 [P] Implement TestOps API for uploading front-end reports (HTML/JSON) (roadmap 0.39)
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 
