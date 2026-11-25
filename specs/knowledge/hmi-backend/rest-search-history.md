@@ -3,7 +3,7 @@ id: KB-HMI-REST-QUERY-001
 title: REST — поиск/навигация (п.6–9) и история ClickHouse (п.10–12)
 service: hmi-backend
 group: api
-source: confluence/hmi-backend-descr.md#«REST: поиск и навигация» (п.6–9), «REST: история (ClickHouse)» (п.10–12)
+source: real_repo_dump/hmi-backend:L2003-L2228 (controller/HistoryV1Controller.java, HistoryV2Controller.java); L3071-L3180 (controller/v2/TagInfoControllerV2.java); L10765-L10897 (service/HistoryServiceLegacy.java)
 requires: []
 related: [KB-HMI-REST-VAL-001, KB-HMI-SVC-001, KB-HMI-CONFIG-001]
 status: verified

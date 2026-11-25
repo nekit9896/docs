@@ -3,7 +3,7 @@ id: KB-HMI-OVERVIEW-001
 title: hmi-backend — назначение, модули, смежные компоненты, API V1/V2
 service: hmi-backend
 group: overview
-source: confluence/hmi-backend-descr.md#«Общее описание», «Тег → Версии API»
+source: real_repo_dump/hmi-backend:L208-L409 (API.md); L437-L536 (README.md); L12014-L12467 (public/API.html)
 requires: []
 related: [KB-HMI-TAG-001, KB-HMI-WS-001, KB-HMI-STREAM-001, KB-HMI-MODEL-001, KB-HM-OVERVIEW-001]
 status: verified

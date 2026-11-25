@@ -3,7 +3,7 @@ id: KB-HMI-MODEL-001
 title: Modelling (маршрутизация сессий) и Topic-Route (переопределение маршрутов)
 service: hmi-backend
 group: data
-source: confluence/hmi-backend-descr.md#«Modelling», «Topic-Route (переопределение маршрутов)»
+source: real_repo_dump/hmi-backend:L8911-L10222 (modelling/*); L11468-L11584 (service/TopicRouteConfig.java)
 requires: [KB-HMI-REST-META-001]
 related: [KB-HMI-STREAM-001, KB-HMI-WS-001, KB-HM-SESSIONS-001]
 status: verified

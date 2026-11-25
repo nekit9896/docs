@@ -3,7 +3,7 @@ id: KB-HMI-TAG-001
 title: Тег, типы значений, Protobuf-схемы, ProtoValidator/ProtoConverter
 service: hmi-backend
 group: data
-source: confluence/hmi-backend-descr.md#«Тег», «Protobuf-схемы»
+source: real_repo_dump/hmi-backend:L208-L409 (API.md); L10223-L10348 (proto/ProtoConverter.java, ProtoValidator.java)
 requires: [KB-HMI-OVERVIEW-001]
 related: [KB-HMI-ERR-001, KB-HMI-REST-VAL-001]
 status: verified

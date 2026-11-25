@@ -4,6 +4,18 @@
 
 **Input**: Feature specification from `/specs/001-hydro-autotest-suite/spec.md`
 
+## Адаптация 2026-11-19
+
+Фактическая организация работ отличается от исходного текста плана (расхождение
+**G43**, `docs/meta/discrepancies-2026-11-19.md`). Ключевые дельты: библиотека
+стенда — наш `sdku-test-tools` вместо `lds-autotest`; pytest-пакеты живут в
+`hydro-backend-tests/` (не в `autotests/`); инфраструктурные ошибки — FAILED с
+диагностикой (не `infra_error`); линтинг — black/isort/flake8; доставка —
+Docker-only образ `evoscada_docker/sdku_test_tools:<semver>` (D41). Полный
+маппинг путей/зависимостей/вердиктов — в `tasks.md`, раздел «Адаптация 2026-11-19»;
+решения — `docs/decisions/2026-11-19-hmi-client-contract.md` (D38–D44).
+Рабочий план этапов — `docs/plans/2026-11-19-hydroslope-autotest-workplan.md`.
+
 ## Summary
 
 Автоматизировать регрессионное тестирование гидрорасчёта (185 кейсов каталога: 85 HY-CALC, 48 HY-HIST, 52 HY-SYS) на базе pytest и клиентов тестового стенда из библиотеки lds-autotest. Технический подход: единый pytest-пакет с адаптерами клиентов, фикстурами восстановления состояния, жёсткой связью «тест ↔ кейс» через идентификаторы каталога, отчётностью JUnit XML + JSON (контракт) и поэтапной поставкой HY-CALC → HY-HIST → HY-SYS. Оценки и порядок задач — `docs/plans/automation-roadmap.md` (126 задач, 1168 ч / 584 SP).

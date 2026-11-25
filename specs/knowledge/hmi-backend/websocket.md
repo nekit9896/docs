@@ -3,7 +3,7 @@ id: KB-HMI-WS-001
 title: WebSocket V1 (/hotlink) и V2 (/v2/hotlink): команды, кадры, обслуживание сессий
 service: hmi-backend
 group: api
-source: confluence/hmi-backend-descr.md#«WebSocket»
+source: real_repo_dump/hmi-backend:L8630-L8680 (hotlink/dto/Command.java, CommandDto.java); L7445-L8083 (HotlinkSessionV2.java); L6364-L6418 (HeadersHandshakeInterceptor.java); L1427-L1476 (configuration/HotlinkWebSocketConfig.java)
 requires: [KB-HMI-STREAM-001]
 related: [KB-HMI-SVC-001, KB-HMI-CONFIG-001, KB-HMI-ERR-001, KB-HMI-REST-VAL-001]
 status: verified
@@ -27,19 +27,49 @@ status: verified
 
 ## V2: `ws://<host>:<port>/v2/hotlink` (JSON-фреймы `CommandDto`)
 
-Кадр: `{"cmd": "...", "id": "req-001", "args": [...], "headers": {...}}`
+Кадр команды (`CommandDto`): `{"cmd": "...", "id": "req-001", "args": [...], "headers": {...}}`
 
 | Поле | Тип | Обязательность |
 |---|---|---|
 | `cmd` | string | required |
-| `id` | string | required (трассировка) |
+| `id` | string | optional (трассировка; страница `tag-monitor.html` шлёт без `id`) |
 | `args` | array / object / null | зависит от команды |
 | `headers` | object | для команд с авторизацией (напр. `X-USER-ALLOW-PATTERNS`, `X-USER-FULLNAME`) |
 
-Ответы: `SUB_ANSWER` (пакет значений подписки), `CALL_ANSWER` (TAG_GET, TAG_FIND,
-TAG_NAMES, OBJECT_TYPES), `CALL_ERROR`, `PONG`.
+**Кадры ответов** (`AnswerDto`): `{"id": ..., "message_type": "...", "message": ...}`
+(+ служебные кадры без `id`):
+
+| message_type | Формат | Когда |
+|---|---|---|
+| `SUB_ANSWER` | `{"message_type":"SUB_ANSWER","message":[...]}` | Пакет значений подписки (агрегация `sample-time`) |
+| `CALL_ANSWER` | `{"id":"...","message_type":"CALL_ANSWER","message":...}` | Ответ на `TAG_GET`/`TAG_FIND`/`TAG_NAMES`/`OBJECT_TYPES`/`TAG_SET` |
+| `CALL_ERROR` | `{"id":"...","message_type":"CALL_ERROR","message":...}` | Ошибка синхронного вызова |
+| `pong` | `{"message_type":"pong","pingId":<id или null>,"hmiToSessionTime":<ms>}` | Ответ на `PING` |
+| `time` | `{"message_type":"time","stream_time_s":<s>,"current_time_s":<s>,"last_tag_data_sent_s":<s>,"stream_state":{"type":"live","id":"<uuid>"}}` | Серверные часы, интервал `clock-message-interval-s` (default 1 с) |
+| `error` | `{"message_type":"error","error_message":...}` | Ошибка уровня сессии |
+
+> `CALL_ANSWER`/`CALL_ERROR` — **message_type кадров-ответов**, не команды:
+> в `Command` enum (L8635-L8651) команды `CALL_ANSWER` нет (расхождение G44).
+
+### Handshake и авторизация (D47, G45)
+
+Идентификация при рукопожатии — **и query-параметрами URL, и HTTP-заголовками**
+одновременно: `HeadersHandshakeInterceptor` (L6364-L6418) кладёт в атрибуты
+сессии `IP`, `x-user-fullname` (`RequestUtils.getAnyUserIdentity`, L11680-L11687:
+заголовки `X-USER-LOGIN` → `X-USER-FULLNAME` → `x-user-fullname` → `X-USER-ID`,
+фолбэк — query `x-user-fullname` с двойной декодификацией) и `queryParameterMap`.
+Query-параметры `X-USER-*` мержатся с `headers` кадров (`HotlinkSessionBase`,
+L7120-L7125) и действуют как умолчания для команд сессии. Образец подключения —
+`tag-monitor.html` (L15045-L15055): `wss://<host>/v2/hotlink?x-user-fullname=
+<double-url-encoded>&X-USER-ALLOW-PATTERNS=<json>` (+ опционально `x-user-ip`,
+`X-USER-FORBIDDEN-PATTERNS`, `modelSessionId`). Пока `!hmiEvoService.isReady()` —
+отказ 503.
 
 ### Команды
+
+Полный состав `Command` enum — 14 команд (канон **D48**: клиент `sdku-test-tools`
+реализует весь enum; `SWITCH {"target":"LIVE"}` — обязательный шаг инициализации
+сессии, в т.ч. после реконнекта; G42 закрыт).
 
 **Подписки:**
 

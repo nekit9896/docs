@@ -1,0 +1,13 @@
+# Расхождения в документации — 2026-11-25 (дамп hmi-backend, WS-канон клиента)
+
+Статус: **на рассмотрении у владельца**. Продолжение нумерации серии G
+(предыдущий журнал — `discrepancies-2026-11-19.md`, последний пункт G43).
+
+| # | Где | Что заявлено | Факт | Комментарий / вопрос владельцу |
+|---|---|---|---|---|
+| G44 | G42 (заявленный состав команд `HotlinkWebSocketHandlerV2`), `confluence/hmi-backend-descr.md` (исторически) | Сервер поддерживает синхронную команду `CALL_ANSWER` | В `Command` enum (дамп `real_repo_dump/hmi-backend:L8635-L8651`) команды `CALL_ANSWER` нет: `SUBSCRIBE`, `UNSUBSCRIBE`, `UNSUBSCRIBE_ALL`, `SWITCH`, `PLAY`, `STOP`, `SEEK`, `SET_MILLIS_PER_TICK`, `PING`, `TAG_GET`, `TAG_SET`, `TAG_FIND`, `TAG_NAMES`, `OBJECT_TYPES` | Текст G42 составлен по описанию; фактический enum команд не содержит `CALL_ANSWER` (возможно, упоминалась V1-ветка/устаревшая версия). Клиент реализует только фактический enum (D48). Вопрос владельцу: подтвердить, что `CALL_ANSWER` не существует в V2 |
+| G45 | KB-HMI-WS-001 / страница `tag-monitor.html` vs `confluence/hmi-backend-descr.md` (исторически) | «WebSocket V2: параметры авторизации передаются в поле `headers` внутри JSON-кадра» | Идентификация при рукопожатии передаётся **query-параметрами URL** (страница: `/v2/hotlink?x-user-fullname=...`, двойное кодирование) и/или HTTP-заголовками (`RequestUtils.getAnyUserIdentity`); сервер декодирует `x-user-fullname` дважды (`getParameter` + `URLDecoder.decode`, дамп L11680-L11687). Внутрикадровые `headers` (`CommandDto`) — отдельный механизм для `X-USER-GET-ALLOW-PATTERNS` подписок | Двойное кодирование — не документированный контракт, а особенность реализации сервера/страницы. Зафиксировано в D47 и KB-HMI-WS-001; клиент кодирует двойно в query и однократно в заголовках. Вопрос владельцу: нормализовать ли сервер (однократная декодировка) или считать двойное кодирование каноном |
+| G46 | KB-HMI-CONFIG-001, `test-plan-rules.md` (hydro-calculation, hydro-history-and-model) | `tn-scada.hmi.clientside-stale-time-s` default **3600** с | В `application.yml` (дамп L11967, L19285) — **600** с; `Minuteman` (L10943-L10980) читает интервал обслуживания 30 с, пороги stale/wake — из конфигурации | В KB-HMI-CONFIG-001 исправлено на 600 (по коду). Расхождение confluence/тест-планов (3600) с фактическим конфигом. Вопрос владельцу: 600 — актуальное значение для стенда? Затронуты формулировки тест-планов «закрывается через 3600 с» |
+
+Ссылки: журнал решений `docs/decisions/2026-11-25-hmi-backend-source-of-truth.md`
+(D45–D48), `docs/decisions/2026-11-19-hmi-client-contract.md` (D38–D44).

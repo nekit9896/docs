@@ -3,7 +3,7 @@ id: KB-HMI-REST-META-001
 title: REST — метаданные (чтение/изменение объектов) и сессии Modelling
 service: hmi-backend
 group: api
-source: confluence/hmi-backend-descr.md#«REST: метаданные (кеш core-meta-data-store)», «REST: сессии (Modelling)»
+source: real_repo_dump/hmi-backend:L2229-L2508 (controller/MetadataController.java); L2840-L2877 (controller/TagInfoEditController.java); L9176-L9225 (modelling/controller/SessionsController.java)
 requires: [KB-HMI-MODEL-001]
 related: [KB-HMI-REST-QUERY-001, KB-HMI-TAG-001, KB-HMI-SVC-001]
 status: verified
@@ -46,11 +46,15 @@ status: verified
 После создания ожидает появления объекта в локальном кэше (**до 5 сек, интервал
 500 мс**).
 
-## Сессии (Modelling) — `SessionsController`
+## Сессии (Modelling) — `SessionsController` (`/v1/sessions`, L9195-L9217)
 
 | Метод | Путь | Описание |
 |---|---|---|
-| POST | `/sessions` | Регистрация сессии (`SessionToServiceDTO`) |
-| DELETE | `/sessions/{sessionId}` | Удаление сессии |
+| GET | `/v1/sessions/list` | Список сессий |
+| GET | `/v1/sessions/{id}` | Информация о сессии (`SessionToServiceDTO`) |
+| POST | `/v1/sessions/start` | Регистрация сессии (`SessionToServiceDTO`) |
+| POST | `/v1/sessions/close/{id}` | Удаление сессии |
 
-> Используется модулем Modelling для маршрутизации сообщений между сервисами.
+> Сверено с кодом (2026-11-25): ранее заявлялось `POST /sessions` +
+> `DELETE /sessions/{sessionId}` — фактические пути другие. Используется модулем
+> Modelling для маршрутизации сообщений между сервисами.
