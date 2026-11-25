@@ -3,7 +3,7 @@ id: KB-HMI-REST-VAL-001
 title: REST — текущие значения тегов (п.1–5: tag-get, tag-set, tag-set-and-wait)
 service: hmi-backend
 group: api
-source: confluence/hmi-backend-descr.md#«REST: текущие значения тегов» (п.1–5)
+source: real_repo_dump/hmi-backend:L2878-L3070 (controller/v2/GetSetControllerV2.java); L1678-L2002 (controller/GetSetController.java)
 requires: [KB-HMI-TAG-001]
 related: [KB-HMI-ERR-001, KB-HMI-CONFIG-001, KB-HMI-REST-QUERY-001]
 status: verified
@@ -41,6 +41,9 @@ status: verified
 
 **Body:** `{"tag":"MN.TU.TAGNAME","data":{"value":"new value","invalid":false,"ts":123456789}}`
 **Ответ:** `200 OK`. При `use-sync-set=true` — после подтверждения применения.
+
+> На уровне контроллера `X-USER-FULLNAME` объявлен `required=false` (L2988);
+> обязательность при записи обеспечивается бизнес-логикой/аудитом (G13).
 
 > Валидация типа значения против типа тега (`ProtoValidator`) → `400` +
 > `ValueConversionException`. **V1** (`POST /tag-set`): body — `HmiMsg.TagValueMsg`.

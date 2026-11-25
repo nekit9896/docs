@@ -1,10 +1,11 @@
 # specs/ — карта знаний СДКУ «ЭВОСКАДА» (Гидроуклон)
 
 Назначение: агенто-ориентированное дерево знаний о бэкенде и сценариях
-тестирования (подход SDD). **Источник истины — `../confluence/`** (8 исходных
+тестирования (подход SDD). **Источник истины — `../confluence/`** (7 исходных
 файлов; изменяются только по прямой команде владельца — D36/D37, журнал —
-`../confluence/README.md`). Всё в `specs/` — производные
-фрагменты со ссылками на источник.
+`../confluence/README.md`); **по hmi-backend — `../real_repo_dump/hmi-backend`**
+(дамп кода, D45/D46, индекс — `../real_repo_dump/hmi-backend-INDEX.md`).
+Всё в `specs/` — производные фрагменты со ссылками на источник.
 
 ## Конвенции
 
@@ -75,6 +76,7 @@
 | `knowledge/platform/roadmap-testing.md` | Roadmap тестирования: слои, этапы 0–3, задачи/оценки, KPI (verified; исходник объединён с `old`, D37; G32, G40) | KB-PLAT-ROADMAP-001 |
 | `knowledge/platform/testops-integration.md` | Тестопс: health-check, топики Kafka, WS/HTTP-эндпоинты (verified; расхождения G33–G34 открыты) | KB-PLAT-TESTOPS-001 |
 | `trace/case-module-matrix.md` | Матрица «модуль репо ↔ кейсы» | — |
+| `../real_repo_dump/hmi-backend-INDEX.md` | Карта дампа кода hmi-backend (навигация по 151 файлу + контрактные зоны; источник истины по hmi-backend, D45/D46) | — |
 | `cases/hydro-calculation/` | Кейсы HY-CALC-* (85) в 8 доменных группах + index.md на группу: base-calcs (3.1), imbalance (3.2), stationarity (3.3), pressure-alarms (3.4), link-alarms (3.5), gravity-reliability (3.6), extra-calcs (3.7), cascade (3.8) | HY-CALC-* |
 | `cases/hydro-history-and-model/` | Кейсы HY-HIST-* (48) в 10 доменных группах + index.md на группу: lifecycle (3.1), historical (3.2), modelling (3.3), import (3.4), export (3.5), watermark-progress (3.6), fault-tolerance (3.7), config-edge-cases (3.8), save-play (3.9), timeshift (3.10) | HY-HIST-* |
 | `cases/system-tests/` | Кейсы HY-SYS-* (52) в 3 группах + index.md на группу: alarm-stubs (3.1, 26 заглушек из HY-CALC), hist-derived (3.2, 19 из HY-HIST), new-scenarios (3.3, 7 новых) | HY-SYS-* |
@@ -85,7 +87,7 @@
 |---|---|---|
 | 1 | `repo_description_hydro-calculation` | ✅ переложен (18 фрагментов) |
 | 2 | `repo_description_hydro-history-and-model` | ✅ переложен (14 фрагментов, G7–G12; дубликаты удалены из источника) |
-| 3 | `hmi-backend-descr.md` (шлюз к main*-топикам Kafka) | ✅ переложен (11 фрагментов, G13) |
+| 3 | ~~`hmi-backend-descr.md`~~ (шлюз к main*-топикам Kafka) | 🗑 источник удалён 2026-11-25 (D45) — заменён дампом `../real_repo_dump/hmi-backend`; 11 фрагментов KB-HMI-* реверифицированы по коду, `source` — на строки дампа (D46) |
 | 4 | `test-plan-hydro-calculation.md` | ✅ переложен (85 кейсов HY-CALC в 8 группах + 2 фрагмента KB-CALC-TESTSTAND/TESTPLAN; G14–G16) |
 | 5 | `test-plan-hydro-history-and-model.md` | ✅ переложен (48 кейсов HY-HIST в 10 группах + 2 фрагмента KB-HM-TESTSTAND/TESTPLAN; G18–G25; кейса 043 нет в источнике) |
 | 6 | `test-plan-of-system-tests.md` | ✅ переложен (52 кейса HY-SYS в 3 группах + 2 фрагмента KB-SYS-TESTSTAND/TESTPLAN; G26–G30) |

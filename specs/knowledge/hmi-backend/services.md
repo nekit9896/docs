@@ -3,7 +3,7 @@ id: KB-HMI-SVC-001
 title: Службы: AppWarmUp, аудит/алармы, диагностика, TagInfoService, ready-состояние
 service: hmi-backend
 group: services
-source: confluence/hmi-backend-descr.md#«Службы (Service Layer)», «Диагностика», «Monitoring / Health-Check», «Активное подключение», «Утилиты»
+source: real_repo_dump/hmi-backend:L10349-L11584 (service/*); L11585-L11895 (utils/*)
 requires: []
 related: [KB-HMI-WS-001, KB-HMI-ERR-001, KB-HMI-CONFIG-001, KB-HMI-REST-QUERY-001]
 status: verified

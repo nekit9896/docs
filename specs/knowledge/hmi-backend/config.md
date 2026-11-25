@@ -3,7 +3,7 @@ id: KB-HMI-CONFIG-001
 title: hmi-backend — переменные конфигурации (env/yml)
 service: hmi-backend
 group: config
-source: confluence/hmi-backend-descr.md#«Конфигурация»
+source: real_repo_dump/hmi-backend:L11896-L12013 (src/main/resources/application.yml); L437-L536 (README.md)
 requires: []
 related: [KB-HMI-WS-001, KB-HMI-STREAM-001, KB-HMI-SVC-001, KB-HM-CONFIG-002]
 status: verified
@@ -69,7 +69,7 @@ status: verified
 |---|---|---|
 | `tn-scada.hmi.sample-time` | `50` | Окно агрегации WS V2 (мс) |
 | `tn-scada.hmi.clock-message-interval-s` | `1` | Интервал серверного времени (с), 0 — отключить |
-| `tn-scada.hmi.clientside-stale-time-s` | `3600` | Тайм-аут неактивной сессии (с) |
+| `tn-scada.hmi.clientside-stale-time-s` | `600` | Тайм-аут неактивной сессии (с); в `application.yml` = 600, ранее заявлялось 3600 (G46) |
 | `tn-scada.hmi.clientside-wake-time-s` | `30` | Тайм-аут пробуждения сессии (с) |
 | `CSPA_HMI_CLIENTSIDE_STALE_TIME_S` / `CSPA_HMI_CLIENTSIDE_WAKE_TIME_S` / `CSPA_HMI_CLOCK_MESSAGE_INTERVAL_S` | — | Альтернативные имена (stale / wake / clock) |
 | `USER_ACTION_TAGNAME` | — | Тег журнала действий в Alarm-Service |

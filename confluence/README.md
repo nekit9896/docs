@@ -9,6 +9,9 @@
 1. **Файлы этой папки НЕ ИЗМЕНЯЮТСЯ** (исключение — явная правка по прямой
    команде пользователя, см. «Зафиксированные правки» ниже). Это единственный
    источник фактов о бэкенде и тест-кейсах (решение D28, `../decisions/`).
+   **Исключение (D45, 2026-11-25):** по hmi-backend источник истины — дамп кода
+   `../real_repo_dump/hmi-backend` (см. `../real_repo_dump/hmi-backend-INDEX.md`);
+   `hmi-backend-descr.md` удалён.
 2. Рабочее дерево знаний — `../specs/` (фрагменты и сценарии со
    `source`-ссылками сюда). Правки фактов возможны только после выгрузки
    новой версии из Confluence — с перекладкой в `../specs/`.
@@ -24,11 +27,16 @@
 | `test-plan-hydro-calculation.md` | test-plan hydro-calculation |
 | `test-plan-hydro-history-and-model.md` | test-plan hydro-history-and-model |
 | `test-plan-of-system-tests.md` | test-plan of system tests |
-| `hmi-backend-descr.md` | hmi-backend descr |
 | `repo_description_hydro-calculation` | описание репозитория hydro-calculation (FUNCTIONALITY.md) |
 | `repo_description_hydro-history-and-model` | описание репозитория hydro-history-and-model |
 
 ## Зафиксированные правки
+
+- **2026-11-25** `hmi-backend-descr.md` **удалён** (по команде пользователя, D45):
+  полностью заменён дампом кода репозитория `../real_repo_dump/hmi-backend`
+  (151 файл, индекс — `../real_repo_dump/hmi-backend-INDEX.md`). Факты
+  KB-HMI-* реверифицированы по коду, `source`-ссылки перепривязаны к дампу.
+  Восстановимо из git. Подробности — `../decisions/2026-11-25-hmi-backend-source-of-truth.md`.
 
 - **2026-11-17** `repo_description_hydro-history-and-model` (по команде
   пользователя): удалены верифицированные дубликаты — §7 и §9–20 (15 повторных

@@ -20,6 +20,30 @@
 - Пути указаны относительно будущего корня репозитория автотестов (`autotests/`); до его создания исходники и артефакты живут в `docs/` и переносятся (решение пользователя)
 - Кейсы каталога: `docs/specs/cases/`; трассировка кейсы↔модули: `docs/specs/trace/case-module-matrix.md`
 
+## Адаптация 2026-11-19 (действующие маппинги)
+
+> Зафиксировано решениями D38–D44 (`docs/decisions/2026-11-19-hmi-client-contract.md`);
+> расхождение исходного текста задач с фактической организацией — **G43**
+> (`docs/meta/discrepancies-2026-11-19.md`). Нумерация и формулировки задач ниже
+> сохранены; при исполнении действуют маппинги:
+>
+> - **Библиотека стенда**: `lds-autotest` → наш **`sdku-test-tools`** (D6/D41);
+>   доменно-независимые адаптеры (HTTP/WS/менеджеры/утилиты) живут в нём
+>   (`sdku-test-tools/sdku_test_tools/{clients,managers,utils}/`).
+> - **Пути**: `autotests/src/hydro_autotests/clients/*` (доменно-независимое) →
+>   `sdku-test-tools/sdku_test_tools/...`; `autotests/tests/*` и всё доменное →
+>   `hydro-backend-tests/{integr_hydro_calc_tests,integr_hydro_mod_hist_tests,system_tests}/`;
+>   `autotests/config/env/*.yaml` → `hydro-backend-tests/.env(.example)` (D13);
+>   `autotests/.gitlab-ci.yml` → `hydro-backend-tests/.gitlab-ci.yml` (черновик,
+>   триггеры не согласованы — D20).
+> - **Вердикты**: `infra_error` → **FAILED** с полной диагностикой в Allure (D42);
+>   ошибки API не ретраятся, инфраструктура ретраится (D42).
+> - **Линтинг/типизация**: ruff/mypy (T003) → black/isort/flake8 (D5, `.clinerules/02-code-quality`).
+> - **Доставка**: wheel/PyPI нет — Docker-only образ `evoscada_docker/sdku_test_tools:<semver>` (D41).
+> - **Клиенты стенда**: T012 (HTTP) и T013 (WS) частично покрыты каркасом
+>   `HttpClient`/`HmiClient`/`HotlinkClient` + `WsConnectionManager`
+>   (юнит-тесты без сети); доменные фикстуры и тайминги кейсов — в задачах фаз 2–3.
+
 ## Phase 1: Setup (Shared Infrastructure)
 
 **Purpose**: Project initialization and basic structure

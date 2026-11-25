@@ -36,7 +36,7 @@ docs/
 |---|---|---|
 | `repo_description_hydro-calculation` | Описание репозитория hydro-calculation (алгоритмы, API) | ✅ переложен в `specs/` (18 фрагментов KB-CALC-*) |
 | `repo_description_hydro-history-and-model` | Описание репозитория hydro-history-and-model | ✅ переложен в `specs/` (14 фрагментов KB-HM-*; дубликаты удалены из источника, G8–G12) |
-| `hmi-backend-descr.md` | Описание hmi-backend (API, WS, Kafka) | ✅ переложен в `specs/` (11 фрагментов KB-HMI-*; G13) |
+| `hmi-backend-descr.md` | Описание hmi-backend (API, WS, Kafka) | 🗑 удалён 2026-11-25 (D45) — заменён дампом кода `real_repo_dump/hmi-backend` (индекс `real_repo_dump/hmi-backend-INDEX.md`); 11 фрагментов KB-HMI-* реверифицированы по коду |
 | `test-plan-*.md` (3 файла) | Тест-кейсы HY-CALC-*, HY-HIST-*, HY-SYS-* | ✅ 3 из 3: hydro-calculation → 85 кейсов HY-CALC (G14–G17); hydro-history-and-model → 48 кейсов HY-HIST (G18–G25); system-tests → 52 кейсов HY-SYS (G26–G30) |
 | `C4.md` | C4-диаграмма платформы | ✅ переложен (KB-PLAT-C4-001, `needs-review`; G1, G31) |
 | `roadmap_coverage.md` | План автотестов: задачи, оценки, диаграммы (объединённая версия для Confluence) | ✅ переложен и верифицирован (KB-PLAT-ROADMAP/TESTOPS-001, `verified`); 2026-11-18 объединён с `old` (D37) |
@@ -44,6 +44,16 @@ docs/
 Актуальный статус перекладки — всегда в `specs/INDEX.md`.
 Прежние выводы аудита (фаза 2) требуют перепроверки — см.
 `meta/discrepancies-2026-11-17.md`.
+
+## Свежие журналы и планы (2026-11-19)
+
+- `decisions/2026-11-19-hmi-client-contract.md` — **D38–D44**: REST/WS-канон
+  клиента hmi-backend (tag-семейство V2, только подписки по WS), X-USER-заголовки,
+  Docker-only доставка (пересмотр D7/D8), политика ошибок и ретраев.
+- `meta/discrepancies-2026-11-19.md` — **G42** (синхронные WS-команды сервера
+  без реализации в клиенте), **G43** (speckit-артефакты vs фактическая организация).
+- `plans/2026-11-19-hydroslope-autotest-workplan.md` — рабочий план этапов:
+  каркас `sdku-test-tools` → сценарный слой → пилот HY-CALC-001 → раскатка.
 
 ## Цикл поддержки документации
 

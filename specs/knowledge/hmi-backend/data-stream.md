@@ -3,7 +3,7 @@ id: KB-HMI-STREAM-001
 title: Data Stream — стримовая обработка (значения, алармы, история)
 service: hmi-backend
 group: data
-source: confluence/hmi-backend-descr.md#«Data Stream»
+source: real_repo_dump/hmi-backend:L3855-L5291 (datastream/*)
 requires: []
 related: [KB-HMI-WS-001, KB-HMI-MODEL-001, KB-HMI-TAG-001]
 status: verified
@@ -19,6 +19,7 @@ status: verified
 |---|---|
 | `DataStreamManager` | Оркестратор: жизненный цикл провайдеров и хендлеров |
 | `DataStreamProvider` (интерфейс) | Источник стримов (Kafka, mock, model) |
+| `LiveDataStreamProvider` | Провайдер live-потока (текущие значения подписок) |
 | `HistoryDataStreamProvider` | Провайдер стримов истории (плеер) |
 | `TagValueStreamHandler` | Входящие значения тегов: буферизация, валидация, доставка подписчикам |
 | `TagAlarmStreamHandler` | Алармы: ретрансляция подписчикам |
